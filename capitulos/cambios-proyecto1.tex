@@ -1,0 +1,70 @@
+\chapter{Cambios respecto al Proyecto I}
+\label{sec:cambios-proyecto1}
+
+Proyecto I definió el problema, los objetivos y un diseño preliminar de entidades y casos de uso para SIGA-Óptica. Durante la construcción del software (Proyecto II) algunas de esas decisiones iniciales se revisaron a la luz de reglas de negocio reales o de restricciones que no eran evidentes en la etapa de anteproyecto. Este capítulo documenta esos cambios: qué se planteó originalmente, qué problema apareció al construirlo, qué solución se adoptó y por qué.
+
+\section{Sucursal: de atributo simple a mecanismo de aislamiento transversal}
+\label{sec:cambios-sucursal}
+
+\textbf{Diseño inicial.} Proyecto I modelaba \code{Sucursal} como un atributo más de \code{User}: ``unidad/ubicación operativa a la que pertenece el usuario''. El diagrama de clases no le asignaba responsabilidad más allá de esa referencia.
+
+\textbf{Problema encontrado.} Al construir los módulos operativos (ventas, compras, caja, inventario, agenda) quedó claro que una sucursal no es solo un dato descriptivo del usuario: cada venta, cada movimiento de caja, cada movimiento de stock y cada sesión de caja pertenecen a una sucursal concreta, y un usuario de una sucursal no debe poder ver ni menos aún modificar los datos operativos de otra.
+
+\textbf{Solución adoptada.} \code{Sucursal} se convirtió en una dimensión transversal del modelo de datos. Quince entidades llevan su propio \code{SucursalId} (\code{Venta}, \code{MovimientoCaja}, \code{MovimientoStock}, \code{SesionCaja}, \code{PedidoProveedor}, \code{ConsultaClinica}, entre otras), y el acceso a esas entidades se filtra automáticamente por la sucursal del usuario autenticado mediante un \emph{Global Query Filter} de Entity Framework Core, descripto en el Capítulo~\ref{mod:15-sucursales}.
+
+\textbf{Justificación del cambio.} Un filtro centralizado a nivel de \code{DbContext} garantiza el aislamiento en todas las rutas de lectura y escritura de una sola vez, en lugar de depender de que cada servicio recuerde aplicar el filtro a mano en cada consulta --- el patrón original, más liviano, exigía justamente esa disciplina manual y no la garantizaba.
+
+\section{Reposición de stock: de pedido automático a notificación}
+\label{sec:cambios-reposicion}
+
+\textbf{Diseño inicial.} Proyecto I planteaba que el módulo de inventario, al alcanzar el stock un nivel mínimo, ``genere alertas'' y ``facilite la reposición con proveedores'' mediante ``pedidos automáticos''.
+
+\textbf{Problema encontrado.} Generar automáticamente un pedido de compra implica decidir por el usuario --- cantidad a pedir, proveedor elegido, condición de pago --- decisiones de negocio que en una óptica real las toma una persona, no un proceso desatendido. Automatizar esa decisión sin supervisión humana arriesgaba generar pedidos incorrectos o innecesarios.
+
+\textbf{Solución adoptada.} El sistema detecta el stock bajo mínimo de forma automática y periódica, y genera una notificación interna dirigida a la sucursal correspondiente. La creación del pedido de compra en sí sigue siendo una acción manual del usuario, hecha desde el módulo de Compras (Capítulo~\ref{mod:10-compras}) a partir de esa alerta.
+
+\textbf{Justificación del cambio.} La automatización se aplicó a la parte mecánica y repetible del problema --- detectar el cruce bajo el mínimo, algo que ningún usuario debería tener que revisar manualmente --- y se dejó en manos de una persona la parte que requiere criterio de negocio: qué comprar, a quién y en qué condiciones.
+
+\section{Descuento de stock: del momento de entrega al momento de emisión del comprobante}
+\label{sec:cambios-stock-emision}
+
+\textbf{Diseño inicial.} La intuición de diseño más directa --- y la primera implementada --- descontaba el stock vendido en el momento en que la mercadería se entregaba físicamente al cliente.
+
+\textbf{Problema encontrado.} Entre la confirmación de una venta y la entrega efectiva del producto puede pasar tiempo (especialmente en una venta ``a pedido'', donde el cristal se fabrica en un laboratorio externo), y en ese intervalo el comprobante fiscal ya fue emitido y el cobro ya pudo haberse realizado. Descontar el stock recién en la entrega dejaba una ventana en la que el sistema mostraba disponible un producto que ya estaba fiscal y comercialmente comprometido.
+
+\textbf{Solución adoptada.} El descuento de stock de las líneas de producto de una venta ocurre en el mismo paso que la emisión del comprobante o factura (\code{Venta.Estado} pasa a \code{Comprobante}\allowbreak \code{Emitido}), no en un paso de entrega separado. El flujo completo está descripto en el Capítulo~\ref{mod:08-ventas}, \S\ref{sec:08-flujo}.
+
+\textbf{Justificación del cambio.} Emitir el comprobante es el punto del proceso en el que la venta queda formalizada --- fiscal y contablemente --- y es, en consecuencia, el punto correcto para que el inventario refleje ese compromiso. Atarlo a la entrega física introducía una inconsistencia entre lo que el sistema fiscal ya daba por vendido y lo que el módulo de inventario todavía mostraba disponible.
+
+\section{Cancelación de citas: de acción autónoma del paciente a solicitud resuelta por el personal}
+\label{sec:cambios-cancelacion}
+
+\textbf{Diseño inicial.} Proyecto I planteaba que el paciente pudiera ``programar, confirmar, reprogramar y cancelar citas de manera autónoma'', y su especificación de caso de uso ponía al Paciente como actor principal de la cancelación, junto al Vendedor y al Administrador.
+
+\textbf{Problema encontrado.} Una cancelación no es un evento aislado: libera un horario del profesional, puede requerir avisar a alguien de una lista de espera y, si ocurre sobre la hora, tiene un costo real para la óptica. Dejar que el paciente cancele directamente desde el portal significaba que un turno podía desaparecer de la agenda sin que nadie del negocio se enterara ni pudiera intervenir.
+
+\textbf{Solución adoptada.} La cancelación quedó en dos pasos: el paciente \emph{solicita} cancelar desde el portal (queda marcada la solicitud sobre el turno) y el personal de la óptica la resuelve, aprobándola o rechazándola desde la agenda. El paciente nunca cancela directamente su propio turno. El flujo está descripto en el Capítulo~\ref{mod:04-agenda-turnos}.
+
+\textbf{Justificación del cambio.} El paciente conserva la capacidad de iniciar la cancelación sin llamar por teléfono --- que era el problema real que el objetivo buscaba resolver --- pero la óptica mantiene visibilidad y control sobre su propia agenda. El costo es un paso adicional en un flujo poco frecuente; el beneficio es que ningún turno se cancela sin que el negocio lo sepa.
+
+\section{Interfaz de usuario: componentes propios en vez de una librería de componentes}
+\label{sec:cambios-ui}
+
+\textbf{Diseño inicial.} El cronograma de Proyecto I fijaba como entorno de frontend ``Vue 3, Vite, Vuetify, Axios'', es decir una librería de componentes ya armada (Vuetify) sobre la que montar las pantallas.
+
+\textbf{Problema encontrado.} Vuetify impone su propio lenguaje visual (Material Design) y su propio sistema de temas. Uno de los objetivos específicos era una interfaz amigable y consistente para el Centro Óptico Santa María, y adoptar la identidad visual de la librería significaba, en la práctica, pelearse con sus estilos por defecto cada vez que el diseño requerido no coincidía con ellos.
+
+\textbf{Solución adoptada.} El frontend no usa ninguna librería de componentes: las pantallas se arman con Tailwind CSS y un conjunto de componentes propios (\code{BaseButton}, \code{BaseModal} y demás), sobre un sistema de tokens de diseño propio que soporta tema claro y oscuro. El detalle está en el Capítulo~\ref{sec:frontend}.
+
+\textbf{Justificación del cambio.} Con un catálogo de componentes acotado y repetitivo --- formularios, tablas, modales --- el trabajo de construirlos una vez resultó menor que el de sobreescribir permanentemente los de una librería, y dejó control total sobre la identidad visual del sistema. El resto del stack planteado (Vue~3, Vite, Axios) se mantuvo tal cual.
+
+\section{Notificaciones: un solo canal real en vez de multicanal desde el inicio}
+\label{sec:cambios-notificaciones}
+
+\textbf{Diseño inicial.} Proyecto I definía la notificación automática como un mensaje enviado ``a través de canales digitales (correo, WhatsApp o SMS)''.
+
+\textbf{Problema encontrado.} Integrar WhatsApp y SMS implica contratar y configurar proveedores externos de mensajería que la óptica no tenía contratados, y construir esa integración sin un canal real para probarla en producción hubiera dejado código sin ejercitar --- estructura pensada para una funcionalidad que en los hechos nadie iba a poder usar todavía.
+
+\textbf{Solución adoptada.} El sistema implementa un centro de notificaciones interno (Capítulo~\ref{mod:13-notificaciones}) con un único canal externo real, email, y preferencias de notificación configurables por usuario. El diseño del módulo no cierra la puerta a agregar otros canales más adelante, pero no incluye código de WhatsApp/SMS sin un proveedor real detrás.
+
+\textbf{Justificación del cambio.} Se priorizó tener un canal completo y verificado --- desde el disparo del evento hasta la entrega real al destinatario --- por sobre tener varios canales parcialmente implementados. Agregar un canal nuevo hoy es extender el sistema existente, no diseñarlo desde cero.

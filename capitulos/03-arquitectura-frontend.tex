@@ -1,0 +1,128 @@
+\chapter{Arquitectura del Frontend}
+\label{sec:frontend}
+
+\begin{quote}
+\itshape
+Este capítulo describe la arquitectura del cliente \code{SIGA-Web}: la organización de \code{src/}, el patrón vista--servicio y el manejo de estado.
+\end{quote}
+
+\section{Visión general}
+\label{sec:frontend-vision-general}
+
+\code{SIGA-Web} es una SPA en \textbf{Vue 3} (Composition API con \code{<script setup>}), \textbf{TypeScript}, empaquetada con \textbf{Vite}, que consume la API REST de \code{SIGA} (backend) vía HTTP/JSON con JWT Bearer. El detalle del contrato de API (endpoints, DTOs, policies) está documentado del lado backend en el Apéndice de Referencia de API; este capítulo cubre solo la arquitectura del cliente.
+
+Stack: Vue 3, TypeScript, Vite (proxy \code{/api/*} al backend en dev), Vue Router 5, Pinia, Axios, Tailwind CSS v4 con tema por variables CSS (claro/oscuro).
+
+\section{Estructura de carpetas}
+\label{sec:frontend-estructura}
+
+Todo cuelga de \code{src/}, un solo nivel de subcarpetas:
+
+\begin{center}
+\begin{tabular}{@{}l p{11.6cm}@{}}
+\toprule
+\textbf{Carpeta} & \textbf{Contenido} \\
+\midrule
+\code{api/} & \code{http.ts}: instancia axios única + interceptores (auth, errores). \\
+\code{assets/} & \code{main.css}: tokens del tema (colores, tipografía, radios, sombras). \\
+\code{components/} & 34 componentes reutilizables: \code{BaseButton}, \code{BaseTable}, \code{BaseModal}, \code{FilterChips}, \code{SearchableSelect}, \code{MultiSelect}, y componentes de dominio como \code{VentaEditor}, \code{TrabajoOpticoCard}, \code{ClienteSelector}. \\
+\code{composables/} & 11 archivos: \code{useHttp} (wrapper de axios), \code{useFieldStyles} (estilos de campo), \code{optica.ts} (estado derivado del editor de venta óptica) y 8 \code{useXxxPdf} (generación de PDFs client-side). \\
+\code{config/} & \code{menuConfig.ts}: árbol de navegación del sidebar. \\
+\code{router/} & \code{index.ts}: único archivo, todas las rutas + guard global. \\
+\code{services/} & 25 archivos, uno por dominio de negocio: \code{ventasService}, \code{inventarioService}, \code{clinicaService}, \code{laboratorioService}, etc. \\
+\code{stores/} & Pinia: \code{auth.ts}, \code{sidebar.ts}, \code{theme.ts}. \\
+\code{utils/} & Funciones utilitarias compartidas. \\
+\code{views/} & 91 vistas, directorio único flat (sin subcarpetas por módulo), convención \code{<Modulo><Accion>View.vue}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Patrón vista, composable y servicio}
+\label{sec:frontend-patron}
+
+No es una cadena rígida de tres capas --- depende de la complejidad de la vista:
+
+\begin{itemize}
+  \item \textbf{Caso general (la mayoría de las vistas CRUD):} la vista llama \textbf{directo al servicio} correspondiente (ej.\ \code{ProductosView.vue} $\rightarrow$ \code{inventarioService.}\allowbreak \code{getProductos()}). El servicio es un módulo con tipos TS (interfaces que reflejan los DTOs del backend) más funciones delgadas que envuelven \code{useHttp()}. No hay lógica de negocio en el servicio, solo el contrato HTTP tipado.
+  \item \textbf{Estado local de formulario:} vive en la vista misma (\code{ref}/\code{reactive} en \code{<script setup>}), no en un composable ni en un store.
+  \item \textbf{Caso con lógica de estado derivado compleja:} un composable dedicado. El ejemplo real es \code{composables/}\allowbreak \code{optica.}\allowbreak \code{ts}, que centraliza el estado del editor de venta/presupuesto óptico (\code{VentaEditor.vue} más \code{TrabajoOpticoCard.}\allowbreak \code{vue}) --- deriva líneas de venta y el bloque \code{TrabajoPedido} a partir de la selección de armazón/cristal/tratamientos.
+  \item \textbf{Generación de PDF:} cada \code{useXxxPdf.ts} es un composable de un solo propósito (arma el documento a partir del DTO ya cargado), no hace fetch.
+  \item \textbf{\code{useHttp()}} envuelve la instancia central de \code{api/http.ts} y devuelve \code{.data} directamente. Lo usan 5 de los 25 servicios (\code{egresosService}, \code{laboratorio}\allowbreak \code{Service}, \code{empleadosService}, \code{reportesService}, \code{ventasService}); los otros 20 importan \code{http}directo de \code{@/api/http}. Ambos estilos comparten el mismo interceptor.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  nodo/.style={capa, minimum width=2.5cm, minimum height=1.2cm, text width=2.35cm, font=\footnotesize},
+  ext/.style={externo, minimum width=2.5cm, minimum height=1.2cm, text width=2.35cm, font=\footnotesize},
+]
+  \node[nodo] (v)   at (0,3)      {Vista (.vue)\\[2pt]\scriptsize estado de formulario local};
+  \node[nodo] (c)   at (0,0)      {Composable de dominio\\[2pt]\scriptsize ej.\ optica.ts};
+  \node[nodo] (st)  at (0,-3)     {Pinia stores\\[2pt]\scriptsize auth, sidebar, theme};
+  \node[nodo] (s)   at (3.6,1.5)  {Service\\[2pt]\scriptsize tipos + fetch tipado};
+  \node[nodo] (h)   at (7.2,1.5)  {useHttp()\\[2pt]\scriptsize wrapper .data};
+  \node[nodo] (ax)  at (10.8,1.5) {api/http.ts\\[2pt]\scriptsize instancia Axios + interceptores};
+  \node[ext]  (api) at (14.4,1.5) {SIGA API\\[2pt]\scriptsize backend};
+
+  \draw[flechaArq] (v) -- node[above,font=\scriptsize,pos=0.55,fill=white,inner sep=1.5pt] {caso simple} (s);
+  \draw[flechaArq] (v) -- node[right,font=\scriptsize] {caso complejo} (c);
+  \draw[flechaArq] (c) -- (s);
+  \draw[flechaArq] (s) -- (h);
+  \draw[flechaArq] (h) -- (ax);
+  \draw[flechaArq] (ax) -- node[above,font=\scriptsize] {Bearer JWT} (api);
+  \draw[flechaArq, dashed] (v) to[out=180,in=180,looseness=1.4]
+        node[left,font=\scriptsize] {estado global} (st);
+\end{tikzpicture}%
+}
+\caption{Flujo de datos en el frontend: de la vista al backend, con las dos rutas posibles (servicio directo o vía composable de dominio) y el acceso a estado global de Pinia.}
+\label{fig:frontend-flujo-datos}
+\end{figure}
+
+\section{Manejo de estado}
+\label{sec:frontend-estado}
+
+\textbf{Pinia}, 3 stores con uso real:
+\begin{itemize}
+  \item \textbf{\code{auth.ts}} --- \code{token}, \code{user} (\code{AuthUser}: email, nombre, permisos, roles, \code{sucursalId}/\code{sucursalNombre}, \code{must}\allowbreak \code{Change}\allowbreak \code{Password}), persistidos en \code{localStorage} (\code{siga_token}/\code{siga_user}) para sobrevivir recargas/pestañas. Expone \code{hasPermission()}, usado tanto por el guard del router como por la UI para mostrar/ocultar acciones.
+  \item \textbf{\code{sidebar.ts}} --- estado de colapso/expansión del sidebar (mobile/desktop).
+  \item \textbf{\code{theme.ts}} --- modo claro/oscuro, aplica la clase \code{.dark} a \code{<html>}.
+\end{itemize}
+
+Todo lo demás (datos de listados, estado de modales, formularios) es estado \textbf{local de componente}, no global --- consistente con que cada vista hace su propio fetch al entrar.
+
+\section{Router}
+\label{sec:frontend-router}
+
+Un único archivo \code{router/index.ts} con aproximadamente 90 rutas planas (no anidadas), cada una con \texttt{meta: \{ requiresAuth?, requiresGuest?, permission?, label? \}}. La mayoría de los componentes se cargan con \code{import()} dinámico (code-splitting por ruta); solo \code{DashboardView}, \code{LoginView}, \code{RegisterView}, \code{PacientesView}, \code{Paciente}\allowbreak \code{Detail}\allowbreak \code{View} y \code{UsuariosView} se importan estáticos.
+
+\textbf{Guard global} (\code{router.beforeEach}), en este orden:
+\begin{enumerate}
+  \item \code{requiresAuth} sin sesión $\rightarrow$ redirige a \code{/login}.
+  \item Autenticado con \code{user.mustChangePassword = true} y no está ya en \code{/}\allowbreak \code{cambiar-contrasena} $\rightarrow$ fuerza redirección ahí (confirma en código lo que documenta el \hyperref[adr:0012]{ADR 0012}: el guard cubre navegación directa y refresh, no solo el login inicial).
+  \item \code{requiresGuest} (login/registro) estando ya autenticado $\rightarrow$ redirige a la primera ruta accesible según permisos (\code{first}\allowbreak \code{Accessible}\allowbreak \code{Route}, de \code{config/}\allowbreak \code{menuConfig.}\allowbreak \code{ts}).
+  \item Ruta con \code{meta.permission} que el usuario no tiene $\rightarrow$ redirige al primer fallback accesible; si no hay ninguno o el fallback es la misma ruta que falló, deja pasar (evita loop infinito; la vista debe manejar el estado vacío).
+\end{enumerate}
+
+La autorización real siempre se revalida en el backend (policies) --- este guard es solo UX, no seguridad.
+
+\textbf{Cobertura de permisos:} el backend declara 57 policies (55 simples más 2 compuestas, ver \S\ref{sec:arch-pipeline}), pero el router solo mapea \textbf{37 permisos distintos} a \code{meta.permission} (contado exacto sobre las aproximadamente 90 rutas). El resto se chequea a nivel de acción con \code{auth.}\allowbreak \code{hasPermission(.}\allowbreak \code{.}\allowbreak \code{.}\allowbreak \code{)} dentro de la vista (botones, ítems de \code{RowContextMenu}), o directamente no tiene UI todavía.
+
+\textbf{Paginación:} dos estrategias conviven sin unificar: \textbf{server-side} en 8 servicios que devuelven \code{PagedResult<T>} (\code{clienteService}, \code{clinicaService}, \code{comprasService}, \code{egresosService}, \code{inventarioService}, \code{notificacion}\allowbreak \code{Service}, \code{patientService}, \code{ventasService}) y \textbf{client-side} en aproximadamente 18 vistas que hacen slicing local con una constante \code{PAGE_SIZE} sobre la lista completa ya traída.
+
+\section{Sidebar y navegación (\texttt{config/menuConfig.ts})}
+\label{sec:frontend-sidebar}
+
+Árbol de navegación separado del router: cada nodo (\code{MenuItem}/\code{MenuChild}, hasta 3 niveles de anidamiento) tiene \code{permission} propio y opcionalmente \code{zone} (agrupa secciones bajo un título: \textit{General, Atención, Óptica, Comercial, Gestión}). \code{AppSidebar.vue} renderiza este árbol filtrando por \code{auth.}\allowbreak \code{hasPermission()}.
+
+\section{Responsive (mobile/tablet)}
+\label{sec:frontend-responsive}
+
+Sidebar como drawer superpuesto en mobile/tablet (no reflow), controlado por la variable CSS \code{--sidebar-width} que el layout de \code{<main>} usa para su \code{margin-left} --- en breakpoints angostos se fuerza a \code{0} y el sidebar pasa a overlay. Tablas anchas usan scroll horizontal contenido, no reflow de columnas.
+
+\section{Sistema de diseño}
+\label{sec:frontend-design-system}
+
+Fuente de verdad visual: \code{design-system.md} (tokens de color, radius, sombras, motion, tipografía, layout, \code{useFieldStyles()}, badges, avatares, componentes base, anti-patrones).
+
+Convenciones transversales: \code{rounded-xl} para modales; patrón de activar/desactivar entidades solo desde menú contextual (\code{RowContextMenu}), nunca desde el modal de edición; layout de página autenticada con padding \code{p-8} fijo, sin \code{max-w-*}.

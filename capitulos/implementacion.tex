@@ -1,0 +1,75 @@
+\chapter{Implementación}
+\label{sec:implementacion}
+
+\section{Requisitos}
+\label{sec:impl-requisitos}
+
+El sistema se despliega como un conjunto de contenedores Docker sobre un servidor Linux. El anteproyecto fijó como restricción de hardware un mínimo de 4 núcleos, 16~GB de RAM y 1~TB de almacenamiento; sobre esa base, el ambiente de producción real es un VPS (Contabo) con Ubuntu~24.04 LTS.
+
+Software requerido en el servidor:
+
+\begin{itemize}
+  \item Docker Engine y Docker Compose~\cite{docker} (plugin \texttt{compose}).
+  \item Ningún otro runtime --- .NET, Node y PostgreSQL corren únicamente dentro de sus propios contenedores, no instalados en el host.
+\end{itemize}
+
+\section{Instalación}
+\label{sec:impl-instalacion}
+
+El despliegue se define en \code{docker-compose.}\allowbreak \code{prod.}\allowbreak \code{yml}, con cuatro servicios sobre una red interna de Docker (\code{siga_net}):
+
+\begin{longtable}{p{3cm}p{10.6cm}}
+\caption{Servicios del stack de producción.}
+\label{tab:impl-servicios}\\
+\toprule
+\textbf{Servicio} & \textbf{Rol} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Servicio} & \textbf{Rol} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\code{db} & PostgreSQL~\cite{postgresql} 16. Sin puerto publicado --- solo accesible desde la red interna de Docker, nunca directamente desde internet \\
+\code{api} & Backend ASP.NET Core, compilado en una imagen multi-stage (SDK de .NET 10 para build, runtime ASP.NET para ejecución). Tampoco publica puerto --- solo se alcanza a través de \code{caddy} \\
+\code{web} & Frontend Vue~3, compilado a estático y servido por su propio contenedor \\
+\code{caddy} & Proxy inverso de borde. Único servicio con puertos publicados al exterior (80 y 443) \\
+\end{longtable}
+
+El repositorio del frontend (\code{SIGA-Web}) se espera como directorio hermano del backend en el servidor, ya que la imagen de \code{web} se construye con contexto relativo \code{../SIGA-Web}. La instalación consiste en clonar ambos repositorios, completar el archivo de variables de entorno y levantar el stack:
+
+\newpage
+\begin{lstlisting}
+cd ~/siga/SIGA
+cp .env.example .env   # completar los valores
+docker compose -f docker-compose.prod.yml up -d --build
+\end{lstlisting}
+
+\section{Configuración}
+\label{sec:impl-configuracion}
+
+Toda la configuración de producción se resuelve por variables de entorno, sin archivos de configuración editados a mano dentro de las imágenes:
+
+\begin{longtable}{p{4.2cm}p{9.4cm}}
+\caption{Variables de entorno del stack de producción.}
+\label{tab:impl-env}\\
+\toprule
+\textbf{Variable} & \textbf{Uso} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Variable} & \textbf{Uso} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\code{POSTGRES_}\allowbreak \code{DB/}\allowbreak \code{_}\allowbreak \code{USER/}\allowbreak \code{_}\allowbreak \code{PASSWORD} & Credenciales de la base de datos, compartidas entre \code{db} y \code{api} \\
+\code{JWT_SECRET} & Clave de firma de los tokens de autenticación (JWT~\cite{rfc7519}) \\
+\code{DOMAIN} / \code{ACME_EMAIL} & Dominio público del sistema y correo de contacto para el certificado TLS \\
+\code{SEED_}\allowbreak \code{ADMIN_}\allowbreak \code{EMAIL/}\allowbreak \code{_}\allowbreak \code{PASSWORD} & Credenciales de la cuenta administradora inicial, creadas por el \emph{seeder} en el primer arranque \\
+\code{RESEND_}\allowbreak \code{API_}\allowbreak \code{KEY/}\allowbreak \code{_}\allowbreak \code{FROM_}\allowbreak \code{EMAIL/}\allowbreak \code{_}\allowbreak \code{FROM_}\allowbreak \code{NAME} & Envío de emails transaccionales (verificación de cuenta, recuperación de contraseña, recordatorios) \\
+\code{HCAPTCHA_SECRET} / \code{VITE_}\allowbreak \code{HCAPTCHA_}\allowbreak \code{SITE_}\allowbreak \code{KEY} & Protección anti-bot en formularios públicos (backend y frontend, respectivamente) \\
+\end{longtable}
+
+\code{Caddy}~\cite{caddy} resuelve dos responsabilidades de borde sin configuración manual adicional: emite y renueva automáticamente el certificado TLS del dominio configurado (protocolo ACME, Let's Encrypt), y enruta cada request según su ruta --- \code{/api/*} y \code{/uploads/*} al backend, cualquier otra ruta a la aplicación Vue servida como \emph{single-page application} con \emph{fallback} a \code{index.html} para que el enrutamiento del lado del cliente funcione en una recarga de página directa sobre una ruta interna.

@@ -1,0 +1,736 @@
+\chapter{Manual de Usuario}
+\label{sec:manual-usuario}
+
+Sistema de gestión para óptica.
+
+\begin{quote}
+\itshape
+Escrito a partir de las pantallas reales del sistema. Si una opción descrita aquí no aparece en el menú de un usuario, es por permisos --- ver la Sección~\ref{sec:mu-faq}.
+\end{quote}
+
+\section{Qué es SIGA y para quién}
+\label{sec:mu-que-es}
+
+SIGA es el sistema de gestión de la óptica. Desde un mismo lugar se atiende a los pacientes (turnos, consultas y recetas), se administra el catálogo y el stock de productos, se hacen las compras a proveedores, se venden lentes y servicios, se maneja la caja del día y se sacan reportes. Se usa desde el navegador: cada persona entra con su usuario y contraseña y ve solamente las pantallas que le corresponden según su rol.
+
+\subsection{Los roles que existen}
+\label{sec:mu-roles-existentes}
+
+SIGA arranca con tres roles ya cargados de fábrica. Lo que cada rol puede hacer está definido por sus permisos:
+
+\begin{itemize}
+  \item \textbf{Administrador}: tiene todos los permisos del sistema, con una sola excepción (no tiene el permiso de ``Mis Turnos'', que es la vista pensada para pacientes). En la práctica el Administrador ve y puede usar todos los módulos: pacientes, agenda, clínica, catálogo, inventario, compras, egresos, ventas, laboratorio, caja, reportes, personal, usuarios, roles, sucursales y configuración. Es el único rol que el sistema mantiene sincronizado solo: sus permisos se recalculan cada vez que se reinicia y no se editan a mano.
+  \item \textbf{Profesional}: de fábrica viene sin permisos asignados. Esto es a propósito: el Administrador le asigna a mano los permisos que necesite ese profesional en particular (por ejemplo ver la agenda, ver y registrar consultas, ver el historial clínico). Hasta que el Administrador le cargue permisos, un Profesional recién creado no ve ningún módulo de gestión.
+  \item \textbf{Paciente}: tiene dos permisos, ``ver el panel de control'' y ``ver mis turnos''. Con eso el paciente entra a su propio panel, reserva y consulta sus turnos, ve su historial clínico y descarga sus recetas. No ve nada de la operación interna de la óptica.
+\end{itemize}
+
+\subsection{Roles a medida}
+\label{sec:mu-roles-medida}
+
+Además de esos tres, el Administrador puede crear todos los roles que la óptica necesite (por ejemplo Recepcionista, Vendedor, Cajero, Encargado de Depósito, Optometrista) desde la pantalla ``Roles y Permisos'', eligiendo uno por uno qué puede hacer cada rol. Así, un Recepcionista puede tener solo agenda y recepción; un Vendedor, ventas y clientes; un Encargado de Depósito, inventario y stock; y así con cada puesto. El manual describe todas las pantallas, pero cada persona verá solo aquellas para las que su rol tenga permiso.
+
+En resumen: lo que ve y puede hacer cada usuario no depende de ``quién es'' sino de ``qué permisos tiene su rol''. Por eso dos personas distintas pueden ver menús muy diferentes.
+
+\section{Primeros pasos}
+\label{sec:mu-primeros-pasos}
+
+\subsection{Cómo se ingresa}
+\label{sec:mu-como-ingresa}
+
+Se entra por la pantalla de inicio de sesión. Pide dos datos:
+
+\begin{itemize}
+  \item Usuario o Correo electrónico
+  \item Contraseña (hay un botón de ojo para ``Mostrar contraseña'' u ``Ocultar contraseña'')
+\end{itemize}
+
+Se confirma con el botón Iniciar Sesión (mientras verifica muestra ``Verificando...''). Si los datos están mal, avisa ``Credenciales incorrectas. Intenta de nuevo.''; si no hay conexión, ``No se pudo conectar con el servidor. Verifica tu conexión.''
+
+No hay opción de ``recordarme'': la sesión queda guardada en el navegador y sigue abierta aunque se cierre y se vuelva a abrir, hasta que se use ``Cerrar sesión''.
+
+Apenas se ingresa, el sistema lleva al Panel de Control si el usuario tiene permiso para verlo; si no, a la primera pantalla a la que tenga acceso.
+
+\subsection{La primera vez: cambio de contraseña obligatorio}
+\label{sec:mu-cambio-obligatorio}
+
+Cuando el Administrador crea una cuenta, le asigna una contraseña provisoria. La primera vez que se entra con ella, el sistema obliga a cambiarla antes de dejar hacer cualquier otra cosa: lleva a la pantalla ``Cambiá tu contraseña'' y no deja salir de ahí hasta que se cambie. Pide:
+
+\begin{itemize}
+  \item Contraseña provisoria (la que se recibió)
+  \item Contraseña nueva (mínimo 8 caracteres, con al menos una letra y un número)
+  \item Confirmar contraseña nueva
+\end{itemize}
+
+Se confirma con Cambiar contraseña y continuar. Recién ahí el sistema deja usar el resto de las pantallas. Lo mismo pasa cuando un Administrador ``restablece la contraseña'' de un usuario: la próxima vez que entre, tendrá que elegir una nueva.
+
+\subsection{Cómo se recupera la contraseña}
+\label{sec:mu-recuperar-password}
+
+Si se olvidó, en la pantalla de ingreso se toca la opción Olvidó su contraseña. Eso lleva a una pantalla donde se carga el Correo electrónico, se completa el captcha de seguridad y se toca Enviar enlace. El sistema, por privacidad, siempre responde ``Si el correo ingresado corresponde a una cuenta, te enviamos un enlace''. Se revisa el email, se entra al enlace y ahí se elige la nueva contraseña (Nueva contraseña y Confirmar contraseña, con la misma regla de complejidad) y se confirma con Restablecer contraseña. Si el enlace ya venció, la pantalla ofrece Pedir un nuevo enlace.
+
+\subsection{Registro de pacientes}
+\label{sec:mu-registro-pacientes}
+
+Los pacientes pueden crearse su propia cuenta desde el enlace ``¿Sos paciente y no tenés cuenta? Registrate aquí'', en la pantalla de ingreso. Completan nombre, apellido, cédula, fecha de nacimiento, teléfono, email y contraseña, más un captcha. Después reciben un correo para verificar el email y activar la cuenta. El personal de la óptica no se registra solo: sus cuentas las crea el Administrador.
+
+\subsection{Cómo se cierra sesión}
+\label{sec:mu-cerrar-sesion}
+
+Arriba a la derecha está el nombre del usuario con sus iniciales. Al tocarlo se abre un menú que muestra nombre, email y roles, y ofrece:
+
+\begin{itemize}
+  \item Cambiar contraseña: abre una ventana para cambiarla cuando se quiera (Contraseña actual, Contraseña nueva y confirmación).
+  \item Preferencias de notificación: qué avisos recibir por email y una ventana de silencio horaria opcional.
+  \item Cerrar sesión: cierra la cuenta y devuelve a la pantalla de ingreso.
+\end{itemize}
+
+En esa misma barra de arriba hay un botón para cambiar entre tema claro y oscuro, y una campana de notificaciones (solo si se tiene permiso para verlas).
+
+\subsection{Por qué cada uno ve un menú distinto}
+\label{sec:mu-menu-distinto}
+
+El menú de la izquierda está organizado en zonas (General, Atención, Óptica, Comercial, Gestión) y dentro de cada zona hay módulos. El sistema muestra solamente los módulos y las opciones para los que el rol del usuario tiene permiso. Si no hay permiso de un módulo, ese módulo directamente no aparece, y si una zona entera queda sin módulos, la zona no se muestra. Por eso es normal no ver algunos capítulos de este manual: significa que el rol no tiene ese permiso. Hay además un buscador rápido de módulos (se abre con la tecla ``/'') para saltar directo a lo que se busca.
+
+\section{Zona General}
+\label{sec:mu-zona-general}
+
+\subsection{Panel de Control}
+\label{sec:mu-panel-control}
+
+Para qué sirve: es la pantalla de inicio. Cambia según quién entra.
+
+\begin{itemize}
+  \item \textbf{Paciente}: saludo según la hora y la fecha de hoy, una tarjeta grande con su Próximo turno (fecha, hora, profesional, motivo y estado) o el aviso ``No tenés turnos próximos'', accesos a Reservar turno e Historial clínico, y una lista de Turnos recientes.
+  \item \textbf{Profesional}: saludo con su especialidad y una tira de indicadores (Consultas hoy, Esta semana, Este mes, Pacientes atendidos, Recetas emitidas), más un panel de Últimas consultas con paciente, diagnóstico, fecha y una etiqueta ``Con receta'' cuando corresponde. El botón Ver todas abre la lista de consultas.
+  \item \textbf{Personal de la óptica}: saludo e indicadores del negocio (Pacientes activos, Citas hoy, Ingresos semanales, Stock crítico), la agenda del día y un panel de novedades. Abajo a la derecha hay un botón redondo con un más que abre Acciones rápidas: Nueva Cita (lleva a Agenda) y Nuevo Paciente (lleva a Pacientes).
+\end{itemize}
+
+Cómo se llega: es la pantalla que aparece al ingresar, o el primer ítem del menú.
+
+\subsection{Notificaciones}
+\label{sec:mu-notificaciones}
+
+Para qué sirve: ver los avisos del sistema (por ejemplo stock bajo, una transferencia pendiente o un pedido de laboratorio que llegó).
+
+Qué se ve: el título con el total, un botón Solo no leídas para filtrar, y la lista de avisos con su ícono, el mensaje y cuándo ocurrió. Las no leídas quedan resaltadas con un punto. Abajo hay paginación cuando son muchas.
+
+Tareas:
+\begin{itemize}
+  \item Marcar todas como leídas: botón arriba a la derecha (aparece si hay pendientes).
+  \item Ver solo pendientes: botón Solo no leídas.
+  \item Marcar una como leída: se toca la notificación.
+\end{itemize}
+
+\subsection{Mis Turnos (paciente)}
+\label{sec:mu-mis-turnos}
+
+Para qué sirve: que el paciente reserve, vea y pida cancelar sus turnos.
+
+Qué se ve: si tiene un turno activo, una tarjeta Tu próximo turno con fecha, hora, profesional, motivo y estado. Un calendario mensual navegable (con Hoy y flechas de mes) donde cada día puede mostrar la hora del turno, una leyenda de colores, y abajo una tabla Historial con Fecha, Profesional, Motivo y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Reservar turno: botón Reservar turno (o tocar un día futuro del calendario). Se abre la ventana Reservar turno con pasos: elegir Sucursal (si hay más de una), elegir Profesional, elegir Horario disponible y escribir un Motivo de consulta. Se confirma con Reservar Turno. No se puede reservar un turno nuevo si ya se tiene uno activo; primero hay que cancelarlo.
+  \item Solicitar cancelación: en la tarjeta del turno, botón Solicitar Cancelación. El sistema aclara que un miembro del equipo confirmará la cancelación. Queda como ``Cancelación solicitada'' hasta que el equipo la aprueba.
+\end{itemize}
+
+\subsection{Mi Historial (paciente)}
+\label{sec:mu-mi-historial}
+
+Para qué sirve: que el paciente vea sus consultas y diagnósticos. Es solo de lectura.
+
+Qué se ve: una lista de tarjetas, una por consulta, con la fecha, el profesional y los campos Motivo, Diagnóstico, Plan de tratamiento y Observaciones. Si la consulta tiene receta, aparece la etiqueta ``Receta emitida''.
+
+\subsection{Mis Recetas (paciente)}
+\label{sec:mu-mis-recetas}
+
+Para qué sirve: que el paciente vea sus prescripciones ópticas y descargue el PDF de cada una.
+
+Qué se ve: una tarjeta por receta, con fecha y profesional, y una tabla con Esférico, Cilindro, Eje y Adición para el ojo derecho (OD) y el izquierdo (OI), más DIP, agudeza visual sin corrección y con corrección, y observaciones.
+
+Tareas: descargar el PDF con el botón PDF en cada receta.
+
+\section{Zona Atención}
+\label{sec:mu-zona-atencion}
+
+\subsection{Pacientes}
+\label{sec:mu-pacientes}
+
+Para qué sirve: administrar la base de pacientes.
+
+Cómo se llega: menú Atención, Pacientes.
+
+Qué se ve: filtros por estado (Activo / Inactivo) y un buscador por nombre, cédula o contacto. Una tabla con Nombre del Paciente, C.I., Fecha de Registro, Estado y acciones. Al pie, el conteo y la paginación, más dos tarjetas resumen (Pacientes Activos y Total Registros).
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Añadir Paciente. Se completa Nombre, Apellido, Nro. de Cédula, Fecha de Nacimiento, Sexo, Teléfono y Email (se exige al menos teléfono o email). Se guarda con Guardar Paciente. También existe una página completa ``Registrar Paciente'' con los mismos campos.
+  \item Ver / Editar / Desactivar: el menú de cada fila (los tres puntos) ofrece Ver detalle, Editar y Desactivar. Al desactivar, el sistema aclara que el paciente no podrá ingresar pero sus datos se conservan.
+  \item Ver detalle: al tocar una fila se abre la ficha, con pestañas Información, Citas y Turnos, Historial Clínico y Ventas (esta última marcada como ``Pronto''). Desde la ficha también se puede Editar y Desactivar.
+\end{itemize}
+
+\subsection{Agenda}
+\label{sec:mu-agenda}
+
+Para qué sirve: gestionar los turnos de toda la óptica.
+
+Cómo se llega: menú Atención, Agenda.
+
+Qué se ve: la fecha actual con modos día, semana y mes, un filtro por profesional, seis tarjetas de conteo (Total, Pendientes, Confirmados, En sala, Completados, Cancelados) y chips para filtrar por estado. La tabla muestra Hora, Profesional, Paciente, Motivo, Estado y Acciones.
+
+Tareas:
+\begin{itemize}
+  \item Nuevo turno: botón Nuevo Turno. Se elige Profesional, Fecha, Horario (según disponibilidad), Paciente (buscando por nombre o cédula), Motivo y Notas internas. Se confirma con Confirmar Turno. El sistema no deja reservar en fechas pasadas ni en horarios ya ocupados, y solo ofrece los días y horas en que el profesional trabaja (cada turno dura 30 minutos).
+  \item Confirmar llegada: en el menú de la fila, Confirmar llegada marca al paciente como Presente (así pasa a la sala de espera / Recepción).
+  \item Cancelar turno: en el menú de la fila, Cancelar turno, con confirmación.
+  \item Gestionar solicitud de cancelación: cuando un paciente pidió cancelar, la fila muestra ``Solicita cancelar'' y el menú ofrece Gestionar solicitud, donde se puede Aprobar o Rechazar.
+\end{itemize}
+
+\subsection{Clínica: Recepción}
+\label{sec:mu-clinica-recepcion}
+
+Para qué sirve: que recepción vea los pacientes que ya llegaron (estado Presente) y les arranque la consulta.
+
+Cómo se llega: menú Atención, Clínica, Recepción.
+
+Qué se ve: la fecha de hoy, una tarjeta Pacientes en sala con el número, y una tabla con Hora, Profesional, Paciente, Motivo y Acciones. Si no hay nadie, dice ``Sin pacientes en sala''.
+
+Tareas:
+\begin{itemize}
+  \item Actualizar: botón Actualizar para recargar la lista.
+  \item Iniciar consulta: en el menú de la fila, crea la consulta del paciente y lleva al formulario clínico.
+  \item Cancelar turno: en el menú de la fila, con confirmación.
+\end{itemize}
+
+\subsection{Clínica: Consultas}
+\label{sec:mu-clinica-consultas}
+
+Para qué sirve: listar y gestionar las consultas clínicas.
+
+Cómo se llega: menú Atención, Clínica, Consultas.
+
+Qué se ve: buscador por paciente, cédula o diagnóstico, filtro por profesional, y una tabla con Fecha, Paciente, Profesional, Diagnóstico y Estado (con etiqueta ``Con receta'' cuando corresponde).
+
+Tareas:
+\begin{itemize}
+  \item Nueva consulta: botón Nueva Consulta, que abre el formulario de alta. Ahí se elige el Paciente y el Profesional, se cargan Fecha y Motivo de consulta (obligatorios) y el Diagnóstico Principal (obligatorio). Un interruptor Incluir detalles de consulta agrega Anamnesis, Examen Físico, Diagnóstico Secundario, Plan de Tratamiento y Observaciones. Otro interruptor, Incluir receta óptica, despliega la prescripción (Fecha de Emisión, tabla OD/OI con Esfera, Cilindro, Eje y Adición, Distancia Interpupilar, agudeza visual sin y con corrección, y observaciones). Se guarda con Guardar Consulta.
+  \item Cambiar de estado: en el menú de la fila aparecen, según corresponda, Abrir consulta, Cerrar consulta o Cancelar consulta.
+  \item Editar consulta: en el menú, Editar consulta (abre una página de edición; el paciente y el profesional quedan fijos y no se cambian). Al editar se exige que quede cargado el Diagnóstico Principal.
+  \item Receta: en el menú, Agregar receta o Ver / Editar receta. La ventana de receta tiene un botón Descargar PDF cuando ya existe.
+  \item Eliminar: en el menú, Eliminar, con confirmación.
+\end{itemize}
+
+Estados de una consulta: Pendiente, Abierta, Cerrada y Cancelada.
+
+\subsection{Clínica: Historial}
+\label{sec:mu-clinica-historial}
+
+Para qué sirve: consultar el historial clínico completo de un paciente. Es solo de lectura.
+
+Cómo se llega: menú Atención, Clínica, Historial.
+
+Qué se ve: un buscador Buscar paciente (por nombre o cédula). Al elegir uno, aparece su ficha y una línea de tiempo de consultas con todos los campos clínicos y, si hay, la prescripción óptica. La etiqueta ``Con receta'' marca las consultas con prescripción.
+
+\section{Zona Óptica}
+\label{sec:mu-zona-optica}
+
+\subsection{Catálogo: Productos}
+\label{sec:mu-catalogo-productos}
+
+Para qué sirve: administrar el catálogo de productos (armazones, accesorios, lentes de contacto, soluciones, etc.).
+
+Cómo se llega: menú Óptica, Catálogo, Productos.
+
+Qué se ve: un selector de Categoría, un botón Bajo stock para resaltar los que están por debajo del mínimo, y un buscador por nombre o SKU. La tabla muestra Producto (con miniatura), Categoría, SKU y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nuevo Producto. Campos Nombre, Categoría, SKU / Código (opcional), Precio de costo (debajo muestra el Precio de venta calculado según el margen de la categoría), Marca, Modelo (se habilita al elegir marca), Color, Talle y Descripción. Se guarda con Crear Producto.
+  \item Editar: en el menú de la fila, Editar. Además de los datos permite gestionar la Imagen (Subir imagen, Cambiar imagen, Quitar imagen) y ver el Estado.
+  \item Ver detalle: al tocar la fila se abre un panel con imagen, datos y descripción.
+  \item Desactivar / Activar / Eliminar: en el menú. Desactivar deja el producto oculto pero conserva sus datos; Eliminar es permanente y el sistema recomienda desactivar en lugar de eliminar si el producto tiene movimientos o ventas.
+\end{itemize}
+
+\subsection{Catálogo: Categorías}
+\label{sec:mu-catalogo-categorias}
+
+Para qué sirve: gestionar las categorías de productos, con su margen de ganancia y su descuento.
+
+Cómo se llega: menú Óptica, Catálogo, Categorías.
+
+Qué se ve: filtro por estado y buscador por nombre. Tabla con Nombre, Tipo, Descripción, Descuento, cantidad de Productos y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nueva Categoría. Campos Nombre, Tipo (Genérico o Armazón; el tipo Armazón habilita el producto en la venta a pedido), Descripción, Margen en porcentaje (ganancia sobre el costo) y Descuento en porcentaje. Se guarda con Crear Categoría.
+  \item Editar / Desactivar / Activar / Eliminar: en el menú de la fila.
+\end{itemize}
+
+\subsection{Catálogo: Armazón (Marcas y Modelos)}
+\label{sec:mu-catalogo-armazon}
+
+\textbf{Marcas.} Para qué sirve: administrar las marcas de armazones y lentes de contacto. Se llega por menú Óptica, Catálogo, Armazón, Marcas. Tabla con Nombre, cantidad de Modelos y Estado. Se crea con Nueva Marca (solo Nombre), y se puede Editar, Desactivar o Activar desde el menú de la fila.
+
+\textbf{Modelos.} Para qué sirve: administrar los modelos, cada uno atado a una marca. Se llega por Armazón, Modelos. Se filtra por Marca y por estado. Se crea con Nuevo Modelo (Marca y Nombre) y se Edita, Desactiva o Activa desde el menú.
+
+\subsection{Catálogo: Óptico (Tipos de Lente y Tratamientos)}
+\label{sec:mu-catalogo-optico}
+
+\textbf{Tipos de Lente.} Para qué sirve: administrar los diseños de lente a pedido (por ejemplo Monofocal, Progresivo) y su precio base sugerido. Se llega por Óptica, Catálogo, Óptico, Tipos de Lente. Se crea con Nuevo Tipo (Nombre y Precio base, que después es editable en cada venta). Se Edita, Desactiva o Elimina desde el menú.
+
+\textbf{Tratamientos.} Para qué sirve: administrar los tratamientos de lentes (por ejemplo Antirreflejo, Fotocromático) y su precio, que se agrega como una línea al cargarlo en una venta. Se llega por Óptico, Tratamientos. Se crea con Nuevo Tratamiento (Nombre y Precio) y se Edita o Desactiva desde el menú.
+
+\subsection{Inventario: Niveles de Stock}
+\label{sec:mu-inventario-niveles}
+
+Para qué sirve: ver y ajustar los niveles mínimo y máximo de cada producto y detectar alertas de bajo o sobre stock.
+
+Cómo se llega: menú Óptica, Inventario, Consultas, Niveles de Stock.
+
+Qué se ve: buscador por nombre, SKU o categoría, y una tabla con Producto, Categoría, Stock actual, Stock mínimo, Stock máximo y Estado (badge Bajo stock, Sobre stock u OK).
+
+Tareas: editar niveles desde el menú de la fila, con Editar niveles de stock. Se cargan Stock mínimo y Stock máximo (opcional). El sistema no deja poner un máximo menor al mínimo.
+
+\subsection{Inventario: Movimientos}
+\label{sec:mu-inventario-movimientos}
+
+Para qué sirve: consultar el historial de entradas y salidas de stock, ver el detalle y descargar comprobante.
+
+Cómo se llega: menú Óptica, Inventario, Transacciones, Movimientos.
+
+Qué se ve: filtros por Tipo (Entradas / Salidas) y Estado (Pendientes / Aprobados / Rechazados). Tabla con Fecha, Producto, Sucursal, Tipo, Cantidad (con signo), Motivo, Registrado por y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Nuevo movimiento: botón Nuevo Movimiento, que abre una página de alta donde se elige el producto (buscando por nombre o SKU), la Fecha y hora, el Tipo (Entrada / Salida), la Cantidad y el Motivo. Se confirma con Confirmar Movimiento. Solo se muestran los motivos aplicables al tipo elegido.
+  \item Ver detalle: al tocar la fila se abre la ficha del movimiento; si ya fue resuelto, muestra quién lo aprobó o rechazó y las observaciones.
+  \item Descargar PDF: en el menú de la fila o desde el detalle.
+\end{itemize}
+
+\subsection{Inventario: Transferencias}
+\label{sec:mu-inventario-transferencias}
+
+Para qué sirve: mover mercadería entre sucursales.
+
+Cómo se llega: menú Óptica, Inventario, Transacciones, Transferencias.
+
+Qué se ve: una lista de tarjetas, una por transferencia, con Origen a Destino, estado, productos con su cantidad, fecha, quién la creó y observaciones.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nueva Transferencia. Se elige Origen (si el usuario no tiene sucursal fija), Destino, los Productos (buscando y cargando cantidades) y Observaciones. Se confirma con Crear transferencia.
+  \item Aceptar o Rechazar: en las transferencias pendientes cuyo destino corresponde al usuario, aparecen los botones Aceptar y Rechazar.
+\end{itemize}
+
+Estados: Pendiente, Aceptada, Rechazada.
+
+\subsection{Inventario: Registrar Conteo e Inventario Físico}
+\label{sec:mu-inventario-conteo}
+
+Para qué sirve: hacer el inventario físico, es decir contar la mercadería real y compararla con lo que dice el sistema.
+
+Cómo se llega: menú Óptica, Inventario, Transacciones, Registrar Conteo (para cargar uno nuevo); y Consultas, Inventario Físico (para ver el historial).
+
+Registrar un conteo (Nuevo Conteo de Inventario): se eligen las categorías a contar, se busca el producto y se carga la cantidad realmente contada en la columna Cant. contada (los que se dejan en blanco no se cuentan). Hay un botón Descargar planilla que genera un PDF en blanco para contar a mano. Se puede escribir una Observación y se confirma con Confirmar Conteo.
+
+Ver el historial (Historial de Inventario): tabla con Fecha, Registrado por, cantidad de Productos, Con diferencia y Estado. Cada conteo se puede abrir para ver el detalle y descargar en PDF (una planilla ``Inventario Físico'' con Producto, SKU, Categoría, Sistema, Físico, Diferencia y Ajuste).
+
+Estados de un inventario físico: Pendiente, Aprobado, Rechazado.
+
+\subsection{Inventario: Aprobaciones (de movimientos y de conteos)}
+\label{sec:mu-inventario-aprobaciones}
+
+\textbf{Aprobaciones de movimientos.} Se llega por Óptica, Inventario, Consultas, Aprobaciones. Muestra solo los movimientos Pendientes. En el menú de la fila (o desde el detalle) se puede Aprobar (el sistema aclara que al confirmar se actualiza el stock; permite escribir Observaciones) o Rechazar (con Motivo del rechazo; no se aplican cambios al stock). También se puede Descargar PDF.
+
+\textbf{Aprobaciones y revisión de inventarios.} Al abrir un inventario físico pendiente se ve la ``Planilla de comparación'' con Producto, Categoría, Sistema (stock al momento del conteo), Físico (lo contado), Diferencia y Ajuste. Con permiso, se puede Aprobar (genera los movimientos de ajuste de stock) o Rechazar (no aplica ningún ajuste), en ambos casos con observaciones.
+
+\subsection{Configuración: Motivos}
+\label{sec:mu-configuracion-motivos}
+
+Para qué sirve: configurar los motivos que se pueden elegir al registrar movimientos de stock.
+
+Cómo se llega: menú Óptica, Inventario, Configuración, Motivos.
+
+Tareas: crear con Nuevo Motivo (Nombre y Aplica a: Entrada, Salida o Ambos), y Editar, Desactivar o Activar desde el menú.
+
+\section{Zona Comercial}
+\label{sec:mu-zona-comercial}
+
+\subsection{Compras: Proveedores}
+\label{sec:mu-compras-proveedores}
+
+Para qué sirve: administrar los proveedores y laboratorios, con datos fiscales, ubicación, redes y contactos.
+
+Cómo se llega: menú Comercial, Compras, Configuración, Proveedores.
+
+Qué se ve: filtro por estado y buscador por nombre o RUC. Tabla con Proveedor, RUC, Ciudad, cantidad de Contactos y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nuevo Proveedor. Campos Nombre comercial, RUC (con formato validado), Razón social, Dirección y Ciudad, redes (Sitio web, WhatsApp, Facebook, Instagram), un interruptor Es laboratorio óptico (para que aparezca al asignar laboratorio en trabajos a pedido) y un bloque de Contactos (Nombre, Cargo, Teléfono, Email; se exige al menos un contacto con nombre). Se guarda con Crear Proveedor.
+  \item Editar / Desactivar / Activar: en el menú de la fila.
+\end{itemize}
+
+\subsection{Compras: Órdenes de Compra}
+\label{sec:mu-compras-ordenes}
+
+Para qué sirve: pedir mercadería a los proveedores.
+
+Cómo se llega: menú Comercial, Compras, Transacciones, Órdenes de Compra.
+
+Qué se ve: chips de filtro por estado (Borradores, Confirmadas, Facturadas, Parciales, Recibidas, Canceladas) y una tabla con Número de OC, Proveedor, Fecha, Ítems / Total y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nueva Orden. Se selecciona el Proveedor (con un buscador por nombre, RUC o ciudad), la Fecha, las Observaciones y los Productos a pedir (con cantidad y precio; el sistema autocompleta el precio de costo). Se guarda con Crear Borrador. La orden nace como Borrador y queda pendiente de aprobación.
+  \item Editar: solo mientras está en Borrador, desde el menú de la fila.
+  \item Cancelar: desde el menú, solo en Borrador. No se puede cancelar una orden ya recibida por completo.
+  \item Ver detalle: al tocar la fila. La ficha tiene pestañas Detalle, Factura, Recepciones y Devoluciones, un botón Descargar PDF y, cuando la orden ya fue recibida, un botón Registrar Devolución (para devolver al proveedor, con producto, cantidad y motivo).
+\end{itemize}
+
+Estados de una orden de compra: Borrador, Confirmada, Recibida parcial, Recibida total, Facturada y Cancelada.
+
+\subsection{Compras: Aprobación de OC}
+\label{sec:mu-compras-aprobacion}
+
+Para qué sirve: revisar las órdenes en Borrador y aprobarlas o rechazarlas.
+
+Cómo se llega: menú Comercial, Compras, Transacciones, Aprobación de OC.
+
+Qué se ve: una tarjeta por orden pendiente, con sus ítems y el total estimado.
+
+Tareas:
+\begin{itemize}
+  \item Aprobar: botón Aprobar (la orden pasa a Confirmada y queda lista para facturar).
+  \item Rechazar: botón Rechazar, con Motivo del rechazo opcional (la orden pasa a Cancelada).
+\end{itemize}
+
+\subsection{Compras: Facturas de Compra}
+\label{sec:mu-compras-facturas}
+
+Para qué sirve: registrar y seguir las facturas de los proveedores.
+
+Cómo se llega: menú Comercial, Compras, Transacciones, Facturas de Compra.
+
+Qué se ve: filtros por Estado (Vigente / Anulada), Condición (Contado / Crédito) y Origen (Con OC / Directa), más selector de proveedor, rango de fechas y buscador por número. Tabla con Nro. Factura, Proveedor, Origen, Fecha Emisión, Monto Total, Condición y Estado.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nueva Factura. Primero se elige el origen: Compra directa (sin orden previa) o Con OC (vinculada a una orden confirmada). Se completa Número de Factura (con formato automático), Fecha de Emisión, Condición (Contado o Crédito), Método de Pago (obligatorio si es contado) o Vencimiento (obligatorio si es crédito). En Con OC los ítems se copian de la orden; en Directa se cargan a mano (los que tienen producto asociado suman stock). El sistema calcula solo el desglose de IVA (Exento, 5\%, 10\%) y el Total. Se guarda con Guardar Factura.
+  \item Ver detalle y Anular: al abrir la factura se ven todos sus datos; con permiso se puede Anular Factura (con Motivo de anulación). Si la factura tenía una orden asociada, esa orden vuelve al estado Confirmada.
+\end{itemize}
+
+\subsection{Compras: Recepciones}
+\label{sec:mu-compras-recepciones}
+
+Para qué sirve: registrar la llegada de la mercadería de una factura con orden.
+
+Cómo se llega: menú Comercial, Compras, Transacciones, Recepciones.
+
+Qué se ve: filtros por estado de la orden, proveedor y fechas. Tabla con número de recepción, Fecha, Proveedor, Factura, OC / Estado, Ítems y Usuario.
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nueva Recepción. Se busca y elige la Factura con OC pendiente, se pone la Fecha de recepción, y en el detalle de ítems se carga cuánto se Recibe de cada producto (no puede superar lo pendiente), con Lote y Vencimiento opcionales (si se pone uno, el otro es obligatorio). Botones Recibir todo y Limpiar ayudan a completar. Se confirma con Confirmar Recepción. Al recibir, cada producto suma stock (entrada aprobada) y se recalcula su precio de venta según el costo y el margen de la categoría.
+  \item Ver detalle: al tocar la fila (solo lectura), con enlace a la factura asociada.
+\end{itemize}
+
+\subsection{Compras: Reportes de Compras}
+\label{sec:mu-compras-reportes}
+
+Para qué sirve: ver los indicadores de compras del período.
+
+Cómo se llega: menú Comercial, Compras, Reportes, Reportes de Compras.
+
+Qué se ve: selector de período (día, semana, mes), tarjetas de Órdenes de compra, Monto facturado, IVA, Pendiente de pago y Recepciones, un gráfico de Compras facturadas, un gráfico de Estado de OC y una tabla de Compras por proveedor.
+
+Tareas: exportar con los botones CSV y PDF.
+
+\subsection{Egresos}
+\label{sec:mu-egresos}
+
+Para qué sirve: registrar y controlar los pagos y gastos de la óptica (gastos generales, honorarios a profesionales, salarios y facturas de compra o de laboratorio).
+
+Cómo se llega: menú Comercial, Egresos.
+
+\textbf{Lista de Egresos} (Transacciones, Lista de Egresos): chips de filtro por Tipo (Honorario, Gasto General, Factura de compra, Factura de laboratorio) y por Estado (Pendiente, Aprobado, Pagado, Rechazado, Anulado), más un botón Vencidos. Tabla con Tipo, Concepto, Monto, Emisión y Estado. En el menú de la fila: Ver detalle y, si está Pendiente, Anular egreso (con motivo).
+
+\textbf{Nuevo Egreso} (Transacciones, Nuevo Egreso): se elige el Tipo (Gasto General o Pago de Personal). Para Pago de Personal se elige entre Profesional o Empleado, la persona y el Período. Para Gasto General se elige la Categoría (se puede crear una nueva con el botón más). Campos comunes: Concepto, Monto a pagar, Fecha, Vencimiento (opcional), Método de pago y Observaciones. Se envía con Enviar Solicitud; el egreso queda pendiente de aprobación.
+
+\textbf{Aprobación} (Transacciones, Aprobación): bandeja de egresos pendientes. En el menú de la fila: Ver detalle, Aprobar (deja el egreso listo para que caja registre el pago) y Rechazar (con Motivo obligatorio).
+
+\textbf{Pagos Pendientes} (Transacciones, Pagos Pendientes): lista de egresos ya aprobados esperando pago. En el menú, Registrar pago abre la pantalla de pago, donde se cargan Fecha de pago, Método de pago, N.\ Comprobante y Observaciones, y se confirma con Confirmar Pago. Quien tiene permiso de aprobar egresos puede marcar Pago externo (no afecta la caja), con un motivo obligatorio.
+
+\textbf{Categorías de Gasto} (Configuración): administra las categorías con que se clasifican los gastos generales. Se crea con Nueva Categoría (Nombre y Descripción) y se Edita o Activa/Desactiva desde el menú.
+
+Estados de un egreso: Pendiente, Aprobado, Pagado, Rechazado, Anulado (y la marca Vencido cuando corresponde).
+
+\subsection{Ventas: Configuración (Timbrados, Clientes, Servicios)}
+\label{sec:mu-ventas-configuracion}
+
+\textbf{Clientes.} Para qué sirve: administrar los clientes y sus datos de facturación. Se llega por Comercial, Ventas, Configuración, Clientes. Filtros por estado y por tipo (Persona Física / Persona Jurídica) y buscador. Se crea con Añadir Cliente. Al editar se cargan los Datos personales y los Datos de facturación (Tipo de Facturación, Razón Social, RUC o CI Fiscal, dirección, email y teléfono de facturación). Se puede Activar o Desactivar desde el menú.
+
+\textbf{Timbrados.} Para qué sirve: administrar los timbrados fiscales (la numeración autorizada) para poder facturar. Se llega por Ventas, Configuración, Timbrados. Se crea con Nuevo Timbrado (Sucursal, Tipo, Número de Timbrado, Establecimiento y Punto de Expedición de 3 dígitos, N.\ Desde, N.\ Hasta, y fechas de inicio y fin de vigencia). El Tipo indica qué documento numera ese timbrado, Factura o Nota de Crédito: son series separadas, así que cada sucursal necesita al menos un timbrado activo de cada tipo --- uno para poder facturar y otro para poder emitir las notas de crédito de las devoluciones. Se Edita o Desactiva desde el menú.
+
+\textbf{Servicios.} Para qué sirve: administrar el catálogo de servicios (consulta, ajuste, reparación) y sus tarifas. Se llega por Ventas, Configuración, Servicios. Se crea con Nuevo Servicio (Nombre, Descripción, Precio). Desde el menú, Tarifas por profesional permite cargar precios distintos por profesional o por especialidad. Se puede Editar y Desactivar.
+
+\subsection{Ventas: Presupuestos}
+\label{sec:mu-ventas-presupuestos}
+
+Para qué sirve: armar cotizaciones que todavía no son ventas.
+
+Cómo se llega: menú Comercial, Ventas, Transacciones, Presupuestos.
+
+Qué se ve: tabla con Número de Presupuesto, Cliente, Fecha, Tipo, Total y Vigencia (con semáforo de vencimiento).
+
+Tareas:
+\begin{itemize}
+  \item Crear: botón Nuevo Presupuesto (abre el mismo formulario que Nueva Venta, en modo presupuesto). Además de los datos de la venta, tiene un campo Validez en días (por defecto 15) y muestra la fecha de vencimiento. El laboratorio no es obligatorio aquí. Se guarda con Guardar presupuesto.
+  \item En el menú de la fila: Descargar PDF, Generar venta (lleva a Nueva Venta con los datos precargados) y Eliminar.
+\end{itemize}
+
+\subsection{Ventas: Nueva Venta}
+\label{sec:mu-ventas-nueva}
+
+Para qué sirve: cargar una venta, ya sea un trabajo óptico a pedido (receta más armazón más lente) o una venta directa de mostrador (productos y servicios).
+
+Cómo se llega: menú Comercial, Ventas, Transacciones, Nueva Venta.
+
+Qué se ve: un selector de modo con dos botones, A pedido (óptica) y Directa (mostrador). La columna principal tiene el selector de cliente, y según el modo el selector de receta y la tarjeta del trabajo óptico. Un bloque de líneas permite agregar productos o servicios (con un conmutador Producto / Servicio, un buscador y un botón Línea manual). La columna lateral tiene Condiciones (Contado / Crédito, Fecha, Observaciones) y el Resumen con el desglose de IVA y el Total.
+
+Tareas (venta a pedido):
+\begin{enumerate}
+  \item Elegir el modo A pedido (óptica).
+  \item Seleccionar el cliente (si no se elige ninguno, la venta queda a Consumidor Final).
+  \item Seleccionar la receta (es obligatoria; si falta, avisa que la receta es obligatoria para una venta a pedido).
+  \item Completar la tarjeta óptica (armazón, lente, tratamientos) y elegir el laboratorio (obligatorio para confirmar).
+  \item Opcional: agregar productos o servicios extra, o una Línea manual (Descripción, Cantidad, Precio Unitario, Categoría Fiscal). Si un servicio tiene tarifas por profesional, se abre una ventana para elegir el profesional y ver el origen del precio.
+  \item Definir Contado o Crédito, fecha y observaciones.
+  \item Botón Crear venta. Al guardar, la venta se confirma y salta directo a la pantalla de cobro.
+\end{enumerate}
+
+Tareas (venta directa): elegir Directa (mostrador), cliente (opcional), agregar productos o servicios, condiciones, y Crear venta.
+
+\subsection{Ventas: Lista de Ventas y Detalle}
+\label{sec:mu-ventas-lista}
+
+\textbf{Lista de Ventas.} Para qué sirve: consultar todas las ventas (solo consulta, no se crea ni edita desde aquí). Se llega por Comercial, Ventas, Transacciones, Lista de Ventas. Filtros por Estado y Tipo y buscador por cliente o comprobante. Tabla con Comprobante, Cliente, Tipo, Fecha, Total, Saldo y Estado. Al tocar una fila se abre el detalle.
+
+\textbf{Detalle de la venta.} Muestra el encabezado con estado y tipo, la botonera de acciones (según el estado: Confirmar, Registrar envío, Registrar recepción, Devolver / Cambiar, Emitir comprobante, Cancelar), las Líneas de venta, los Cobros, el Pedido al laboratorio (si es a pedido) y las Devoluciones, más el Resumen y los datos del Comprobante y la Factura.
+
+\begin{itemize}
+  \item Confirmar (solo en Borrador): si es Directa pasa a Lista para cobrar; si es a pedido pasa a En proceso y el trabajo entra a la cola del laboratorio.
+  \item Devolver / Cambiar (solo con comprobante emitido): ventana con Tipo (Devolución o Cambio), Motivo y los productos a devolver. Solo se pueden devolver productos con stock, no servicios ni lentes a pedido. Al aprobarse la devolución, si la venta se había cerrado con factura, el sistema emite automáticamente la Nota de Crédito correspondiente por el valor de lo devuelto y la muestra en el bloque de Devoluciones. Para eso la sucursal necesita tener cargado un Timbrado de tipo Nota de Crédito vigente (ver Ventas: Configuración); si no lo tiene, la devolución no se puede confirmar. La factura original no se anula: la nota la compensa. El dinero que se reintegra por caja puede ser menor al valor de la nota, porque nunca supera lo que el cliente efectivamente pagó.
+  \item Cancelar: solo se puede en Borrador, Confirmada o En proceso; no una venta ya con comprobante emitido.
+\end{itemize}
+
+Estados de una venta: Borrador, Confirmada, En proceso, Lista para cobrar, Comprobante emitido y Cancelada.
+
+\subsection{Ventas: Cobros Pendientes y Cobrar}
+\label{sec:mu-ventas-cobros}
+
+\textbf{Cobros Pendientes.} Para qué sirve: ver todas las ventas con saldo por cobrar. Se llega por Comercial, Ventas, Transacciones, Cobros Pendientes. Muestra el Saldo total pendiente, una tabla con Comprobante, Cliente, Fecha, Antigüedad, Total, Cobrado, Saldo y Estado, y un panel que agrupa el saldo Por cliente. En el menú de la fila: Cobrar, Emitir comprobante y Ver detalle.
+
+\textbf{Cobrar venta.} Para qué sirve: registrar los cobros (seña, cuota o pago) de una venta. Se ve el estado de la venta y, si se puede cobrar, un formulario de Pago con: Fecha; si es a crédito, el Tipo (Seña o Cuota); y una sección Métodos de pago donde cada línea tiene el método (Efectivo, Tarjeta, Transferencia, Cheque), el Monto y una Referencia opcional. El botón Agregar método suma líneas. Se registra con Registrar cobro. Un cobro no puede superar el saldo pendiente. Si el método es efectivo, hace falta tener la caja abierta: si no, aparece el aviso ``No hay una caja abierta'' con un botón Abrir caja (tarjeta, transferencia y cheque sí se pueden registrar sin caja). Cuando el saldo llega a cero, el sistema recuerda emitir el comprobante para cerrar la venta.
+
+\subsection{Ventas: Emitir documento (comprobante o factura)}
+\label{sec:mu-ventas-emitir}
+
+Para qué sirve: emitir el documento de la venta, ya sea un Recibo Simple (sin datos fiscales) o una Factura Timbrada (documento fiscal). Al emitir se descuenta el stock, se generan los movimientos de caja y la venta pasa a Comprobante emitido. Esta acción no se puede deshacer.
+
+Cómo se llega: desde Cobrar venta o desde el detalle de la venta, con Emitir comprobante.
+
+Tareas:
+\begin{itemize}
+  \item Recibo: seleccionar Recibo Simple y tocar Emitir recibo.
+  \item Factura: seleccionar Factura Timbrada, elegir el Timbrado (si no hay uno activo, ofrece Ir a Timbrados), revisar el próximo número y los datos de la serie, cargar la Fecha de Emisión y Observaciones, y tocar Emitir factura. El sistema controla que el timbrado esté activo, sea de la sucursal de la venta, que la fecha caiga dentro de su vigencia y que no se haya llegado al número máximo.
+\end{itemize}
+
+\subsection{Ventas: Facturas de Venta}
+\label{sec:mu-ventas-facturas}
+
+Para qué sirve: consultar el historial de facturas timbradas emitidas a clientes.
+
+Cómo se llega: menú Comercial, Ventas, Transacciones, Facturas de Venta.
+
+Qué se ve: filtros por Tipo y Condición, rango de fechas y buscador. Tabla con Nro. Factura, Cliente, Tipo, Condición, Fecha Emisión, Total e IVA total. En el menú de la fila: Ver venta y Descargar PDF.
+
+\subsection{Laboratorio}
+\label{sec:mu-laboratorio}
+
+El circuito del laboratorio es para las ventas a pedido: cuando se confirma una venta con lente a pedido, se genera un pedido de trabajo que hay que aprobar, enviar al laboratorio y recibir cuando vuelve terminado.
+
+\textbf{Pedidos} (Comercial, Laboratorio, Pedidos): lista de todos los pedidos, con filtro por Estado y buscador. Tabla con Comprobante, Cliente, Tipo de lente, Laboratorio, Fecha, Estado y Factura. Al abrir un pedido se ve su ficha (receta, lente, armazón, tratamientos) y se puede Imprimir orden o Ver venta completa.
+
+\textbf{Aprobaciones} (Laboratorio, Aprobaciones): pedidos pendientes de aprobación. Con permiso, se puede Aprobar o Rechazar (con Observaciones). Al aprobar, el pedido queda pendiente de envío.
+
+\textbf{Envíos y Recepciones} (Laboratorio, Envíos y Recepciones): filtro por Estado y un semáforo de atraso de entrega. Registrar envío al lab abre una ventana con la Entrega estimada y el Medio de envío (WhatsApp, Email, Portal del laboratorio, Teléfono, En persona, Otro), más un botón para Imprimir orden de trabajo; se confirma con Registrar envío. Cuando vuelve, Registrar recepción marca el pedido como recibido y avisa a la sucursal que está listo para retirar. El cobro de la venta es independiente y no se ve afectado.
+
+\textbf{Facturas} (Laboratorio, Facturas): las facturas que el laboratorio emite por los pedidos ya recibidos (lo que la óptica le debe al laboratorio). Con el botón Registrar se carga N.\ Factura, Timbrado, Fecha Emisión, Monto y Observaciones. Al registrar la factura del laboratorio se genera un egreso pendiente de pago.
+
+Estados de un pedido de laboratorio: Pendiente de aprobación, Pendiente de envío, Enviado, Recibido y Rechazado.
+
+\subsection{Caja}
+\label{sec:mu-caja}
+
+\textbf{Caja} (Comercial, Caja, Caja): maneja la caja del día. Muestra si hay una sesión abierta (fecha y usuario) o no, la Posición de efectivo (Efectivo inicial, Ingresos efectivo, Egresos efectivo, Movimientos) y la lista de Movimientos de la sesión. Los cobros y pagos que no son en efectivo aparecen con la etiqueta ``No afecta caja''. Abrir y cerrar caja requieren permiso.
+
+\begin{itemize}
+  \item Abrir caja: botón Abrir caja. El sistema propone como Monto inicial el efectivo del último cierre; se puede ajustar a mano. Se confirma con Abrir caja. No puede haber dos cajas abiertas a la vez en la misma sucursal.
+  \item Cerrar caja: botón Cerrar caja. Se muestran monto inicial e ingresos y egresos en efectivo como referencia, y se carga el Efectivo contado (lo que se contó físicamente). El sistema indica en vivo si coincide o cuál es la diferencia, y permite una Observación. Se confirma con Confirmar cierre.
+\end{itemize}
+
+\textbf{Historial de Caja} (Caja, Historial de Caja): todas las sesiones pasadas, con Apertura, Cierre, Duración, quién la abrió y cerró, Ingresos, Egresos, Saldo y Estado. En el menú, Ver detalle abre el arqueo (Esperado, Contado, Diferencia) y los movimientos, con las marcas Cuadrada, Sobrante o Faltante.
+
+\textbf{Aprobaciones} (Caja, Aprobaciones): los cierres que quedaron Pendientes de aprobación por diferencia. El supervisor puede Ver arqueo, Aprobar cierre (queda cerrado) o Rechazar cierre (con Motivo obligatorio; el cajero deberá hacer un nuevo conteo).
+
+Estados de una sesión de caja: Abierta, Cerrada y Pendiente de aprobación.
+
+\section{Zona Gestión}
+\label{sec:mu-zona-gestion}
+
+\subsection{Reportes}
+\label{sec:mu-reportes}
+
+Se llega por menú Gestión, Reportes. Es un tablero de entrada con tarjetas que llevan a cada reporte. Se dividen en gerenciales (Reportes de Citas, de Ventas, de Inventario) y operativos (Ventas, Compras, Movimientos de inventario, Movimientos de caja).
+
+\begin{itemize}
+  \item Reportes de Citas: turnos, asistencia, consultas y recetas del período (día, semana, mes), con indicadores, una tendencia, un gráfico por estado, una tabla por profesional y un panel de ausentismo. Exporta a CSV y PDF.
+  \item Reportes de Ventas: facturación, cobros, productos y servicios más vendidos y desempeño por cajero, con indicadores y gráficos. Exporta a CSV y PDF.
+  \item Reporte de Inventario: stock actual, valorización y movimientos del período, con indicadores, stock crítico y top de productos por valor. Exporta a CSV y PDF.
+  \item Reportes operativos: un listado detallado fila por fila (Ventas, Compras, Movimientos de inventario o Movimientos de caja) con filtros por fecha, método de pago, categoría, tipo, operador y sucursal, y un botón Limpiar. Exporta a CSV y PDF.
+\end{itemize}
+
+\subsection{Personal}
+\label{sec:mu-personal}
+
+\textbf{Profesionales} (Gestión, Personal, Profesionales): administra el equipo profesional. Filtro por estado y buscador por nombre, cédula o matrícula. Se crea con Añadir Profesional (nombre, apellido, cédula, nacimiento, email, teléfono, contraseña, matrícula, especialidades, sucursal). En el menú de la fila: Horario (define los días y horas de trabajo y las pausas), Editar y Desactivar. El horario de trabajo es lo que determina qué turnos se pueden reservar.
+
+\textbf{Empleados} (Personal, Empleados): administra el personal no médico (vendedores, recepcionistas, cajeros). Se crea con Añadir Empleado (datos personales, email, contraseña, Cargo, Fecha de Ingreso, Salario Base, sucursal). Se Edita y Desactiva desde el menú.
+
+\textbf{Cargos} (Personal, Cargos): la lista de puestos que se asignan a los empleados. Se crea con Nuevo Cargo (Nombre y Descripción) y se Edita o Activa/Desactiva.
+
+\textbf{Especialidades} (Personal, Especialidades): las especialidades que se asignan a los profesionales. Se crea con Nueva Especialidad (Nombre y Descripción) y se puede Editar o Eliminar (aquí la eliminación es real, no baja lógica).
+
+\subsection{Administración}
+\label{sec:mu-administracion}
+
+\textbf{Usuarios} (Gestión, Administración, Accesos, Usuarios): administra las cuentas del sistema y sus roles. Filtro por tipo y estado. Esta pantalla no crea usuarios nuevos: gestiona los existentes. En cada fila, Gestionar Roles abre una ventana para asignar o quitar roles, Restablecer contraseña (la nueva es provisoria y el usuario deberá cambiarla en su próximo ingreso) y Desactivar usuario.
+
+\textbf{Roles y Permisos} (Accesos, Roles y Permisos): la lista de roles y cuántos permisos tiene cada uno, con el tipo Sistema o Personalizado. Se crea con Nuevo Rol y se editan los permisos con el botón de lápiz. Los roles de sistema no se pueden borrar. El formulario de rol tiene el Nombre del rol y una grilla de permisos por módulo (se puede marcar todo un módulo o permiso por permiso). El rol Administrador es gestionado por el sistema y no se edita desde aquí.
+
+\textbf{Configuración} (Administración, Empresa, Configuración): los datos del negocio (Nombre Fantasía, Razón Social, RUC, Dirección, Teléfono, Email, Sitio Web), que se usan por ejemplo en los encabezados de reportes. Con permiso, se guarda con Guardar.
+
+\textbf{Sucursales} (Empresa, Sucursales): administra los locales del negocio. Se crea con Nueva Sucursal (Nombre, Código, Dirección, Teléfono, Email, Ciudad, Establecimiento) y se Edita o Activa/Desactiva. Una sucursal inactiva no se puede asignar a nuevos usuarios ni operaciones.
+
+\textbf{Ubicaciones} (Empresa, Ubicaciones): administra los departamentos y ciudades que se usan como ubicaciones (por ejemplo al crear sucursales). Tiene pestañas Departamentos y Ciudades, con alta, edición y activación/desactivación.
+
+\textbf{Auditoría} (Administración, Auditoría): la bitácora de las operaciones sensibles del sistema --- quién hizo qué, cuándo y desde qué dirección IP. Cada fila indica la fecha y hora, el usuario, la acción, el recurso afectado y una descripción en español. Se filtra por categoría (Seguridad, Admin, Operativo), por acción puntual, por rango de fechas y por texto libre, que busca tanto en la descripción como en el nombre del usuario. La lista se muestra de lo más reciente a lo más antiguo y se recorre por páginas. Es una pantalla de solo lectura: los registros no se editan ni se borran. Requiere el mismo permiso que la gestión de usuarios, así que normalmente solo la ve un administrador. Quedan registrados los ingresos exitosos y fallidos, los cambios y restablecimientos de contraseña, la desactivación de usuarios, la creación y modificación de roles y su asignación, la anulación de ventas, las devoluciones aprobadas o rechazadas y los cierres de caja aprobados o rechazados.
+
+\section{Flujos completos de punta a punta}
+\label{sec:mu-flujos}
+
+\subsection{Flujo A: Atender a un paciente}
+\label{sec:mu-flujo-a}
+
+\begin{enumerate}
+  \item Agendar el turno. Desde Agenda, botón Nuevo Turno: se elige profesional, fecha, horario y paciente, y un motivo. El turno queda en estado Pendiente. (El paciente también puede reservarlo solo desde Mis Turnos, y puede confirmarlo desde el enlace que le llega por correo, con lo que pasa a Confirmado.)
+  \item Recepción. Cuando el paciente llega, se lo marca como presente: desde Agenda, en la fila del turno, Confirmar llegada. El turno pasa a Presente y el paciente aparece en la pantalla Recepción.
+  \item Iniciar la consulta. Desde Recepción, en la fila del paciente, Iniciar consulta. Eso abre el formulario clínico con el paciente ya cargado. El profesional completa Motivo y Diagnóstico Principal, opcionalmente los detalles (anamnesis, examen, plan) y guarda con Guardar Consulta.
+  \item Cargar la receta. En el mismo formulario de la consulta se activa el interruptor Incluir receta óptica y se cargan los valores (OD/OI con esfera, cilindro, eje, adición, DIP, etc.). También se puede agregar después desde Consultas, en el menú de la fila, con Agregar receta. La receta queda disponible para el paciente (Mis Recetas, con PDF) y es la que después alimenta la venta a pedido.
+  \item Cerrar la consulta y marcar el turno como Completado.
+\end{enumerate}
+
+Una aclaración: el paso del turno a Completado se hace por el cambio de estado del turno; el sistema no lo fuerza automáticamente al cerrar la consulta, es una acción que hace el usuario.
+
+\subsection{Flujo B: Vender unos lentes}
+\label{sec:mu-flujo-b}
+
+\begin{enumerate}
+  \item Seleccionar cliente y cargar la venta. Desde Ventas, Nueva Venta, se elige el modo A pedido (óptica), se selecciona el cliente (o queda Consumidor Final), se selecciona la receta del paciente, se completa la tarjeta óptica (armazón, lente, tratamientos) y se elige el laboratorio. Se pueden agregar productos o servicios extra. Se define Contado o Crédito. Botón Crear venta: la venta se confirma y lleva directo a cobrar.
+  \item Cobrar. En Cobrar venta se registran los pagos (seña, cuota o total), eligiendo método (efectivo, tarjeta, transferencia, cheque). Si es efectivo, la caja tiene que estar abierta. Botón Registrar cobro.
+  \item Emitir el comprobante. Con Emitir comprobante se elige Recibo Simple o Factura Timbrada. Para factura se elige el timbrado, se pone la fecha y se emite. Al emitir, el stock se descuenta, se genera el movimiento de caja y la venta pasa a Comprobante emitido.
+  \item Laboratorio (para el lente a pedido). El pedido de trabajo generado al confirmar la venta se aprueba (Laboratorio, Aprobaciones), se envía (Envíos y Recepciones, Registrar envío) y, cuando vuelve, se recibe (Registrar recepción). El cobro es independiente de este circuito.
+\end{enumerate}
+
+Dos detalles importantes: se puede cobrar apenas la venta está confirmada (Lista para cobrar), sin esperar al laboratorio; y el descuento de stock ocurre recién al emitir el comprobante, no al crear la venta.
+
+\subsection{Flujo C: Abrir y cerrar la caja del día}
+\label{sec:mu-flujo-c}
+
+\begin{enumerate}
+  \item Abrir. Desde Caja, botón Abrir caja. El sistema propone como monto inicial el efectivo con que quedó el último cierre (o cero si es la primera vez); se puede ajustar. Se confirma con Abrir caja. Con la caja abierta ya se pueden registrar cobros y pagos en efectivo. No puede haber dos cajas abiertas a la vez en la misma sucursal.
+  \item Operar el día. Cada cobro en efectivo de una venta y cada pago en efectivo de un egreso genera un movimiento en la caja. Los pagos con tarjeta, transferencia o cheque se registran pero no afectan el efectivo de la caja.
+  \item Cerrar. Botón Cerrar caja. Se cuenta el efectivo real y se carga en Efectivo contado. Se confirma con Confirmar cierre.
+\end{enumerate}
+
+Qué valida el sistema al cerrar: la caja tiene que estar Abierta. El sistema calcula el efectivo esperado como monto inicial más ingresos en efectivo menos egresos en efectivo, y lo compara con lo contado. Hay una tolerancia fija de 50.000 guaraníes: si la diferencia (de más o de menos) es de 50.000 o menos, la caja queda Cerrada directamente; si la diferencia supera los 50.000, la caja queda Pendiente de aprobación y un supervisor tiene que revisarla en Caja, Aprobaciones (donde puede Aprobar el cierre o Rechazarlo, y si lo rechaza la sesión vuelve a estar Abierta para un nuevo conteo). El cierre es un arqueo de efectivo; el sistema no bloquea el cierre por tener ventas sin cobrar.
+
+\subsection{Flujo D: Reponer stock}
+\label{sec:mu-flujo-d}
+
+\begin{enumerate}
+  \item Pedido al proveedor. Desde Compras, Órdenes de Compra, Nueva Orden: se elige el proveedor y se cargan los productos con cantidad y precio. Se guarda como Borrador. Con permiso, se aprueba en Aprobación de OC (pasa a Confirmada).
+  \item Factura de compra. Desde Facturas de Compra, Nueva Factura, con origen Con OC: se elige la orden confirmada, se cargan número de factura, fecha, condición (contado o crédito) y, en contado, el método de pago. La orden pasa a Facturada. (Si es contado en efectivo, hace falta caja abierta y la factura queda pagada; si es crédito, queda pendiente de pago.)
+  \item Recepción de la mercadería. Desde Recepciones, Nueva Recepción: se elige la factura con orden pendiente y se carga cuánto se recibe de cada producto (con lote y vencimiento si aplica). Al confirmar, cada producto suma stock (entrada aprobada) y se recalcula su precio de venta según el costo y el margen de la categoría. La orden pasa a Recibida parcial o Recibida total según lo recibido.
+\end{enumerate}
+
+Una aclaración sobre el orden: la recepción se registra contra la factura, así que la secuencia efectiva es Orden de Compra, luego Factura de Compra, y luego Recepción (la recepción necesita que la orden ya esté Facturada), encadenadas a través de la factura y no de forma independiente. El stock lo actualiza la recepción, no la factura.
+
+\section{Preguntas frecuentes y errores comunes}
+\label{sec:mu-faq}
+
+\textbf{Qué significa cada estado de un turno.} Pendiente: reservado, todavía sin confirmar. Confirmado: el paciente confirmó que viene. Presente: el paciente llegó y está en sala. Completado: ya fue atendido. Cancelado: se anuló. Si el paciente pidió cancelar, aparece además la marca Solicita cancelar hasta que el equipo la resuelve.
+
+\textbf{Qué significa cada estado de una consulta.} Pendiente, Abierta (en curso), Cerrada (terminada) y Cancelada.
+
+\textbf{Qué significa cada estado de una venta.} Borrador (es un presupuesto, todavía editable), Confirmada, En proceso (venta a pedido cuyo lente está en el circuito del laboratorio), Lista para cobrar, Comprobante emitido (ya se emitió recibo o factura y se descargó el stock) y Cancelada.
+
+\textbf{Qué significa cada estado de una orden de compra.} Borrador, Confirmada (aprobada y enviada al proveedor), Facturada (se cargó la factura del proveedor), Recibida parcial, Recibida total y Cancelada.
+
+\textbf{Qué significa cada estado de un egreso.} Pendiente (esperando aprobación), Aprobado (listo para pagar), Pagado, Rechazado y Anulado. La marca Vencido aparece cuando pasó su vencimiento y todavía no se pagó.
+
+\textbf{Qué significa cada estado de un pedido de laboratorio.} Pendiente de aprobación, Pendiente de envío, Enviado, Recibido y Rechazado.
+
+\textbf{Qué significa cada estado de la caja.} Abierta, Cerrada y Pendiente de aprobación (cuando el cierre tuvo una diferencia mayor a la tolerancia y espera revisión de un supervisor).
+
+\textbf{Por qué no veo tal opción o módulo.} Porque el rol del usuario no tiene ese permiso. El menú muestra solo lo que el rol tiene habilitado; si un módulo entero falta, es que no tiene ninguno de sus permisos. Lo mismo pasa dentro de una pantalla: botones como Nuevo, Editar, Desactivar, Aprobar o Anular aparecen solo si se tiene el permiso correspondiente. Si se necesita una opción, hay que pedirle al Administrador que ajuste los permisos del rol.
+
+\textbf{Por qué no se puede cerrar la caja.} Puede ser porque no hay una sesión Abierta (ya se cerró, o nunca se abrió), o porque no se tiene el permiso para operar la caja. Además, si el conteo da una diferencia mayor a 50.000 guaraníes, la caja no queda cerrada del todo: queda Pendiente de aprobación hasta que un supervisor la apruebe.
+
+\textbf{Por qué no se puede cobrar en efectivo.} Porque no hay una caja abierta en la sucursal. Los cobros en efectivo necesitan la caja abierta; los de tarjeta, transferencia o cheque se pueden registrar igual. Hay que abrir la caja y volver a intentar.
+
+\textbf{Por qué no se puede facturar.} Puede faltar un timbrado activo, vigente y de la sucursal, o el timbrado puede haber llegado a su número máximo. Conviene revisar Timbrados.
+
+\textbf{Por qué no deja editar una venta o una orden.} Porque solo se pueden editar mientras están en Borrador. Una vez confirmadas, ya no.
+
+\textbf{Qué es una sucursal y cómo afecta lo que se ve.} Una sucursal es un local del negocio. La óptica arranca con una sucursal llamada Casa Central. Muchas operaciones están atadas a una sucursal: el stock, la caja, los timbrados y las transferencias son por sucursal. Según el usuario, es posible ver y operar solo sobre la sucursal propia. Con un permiso especial para ver todas las sucursales, se ve la información de todas. Por eso, por ejemplo, la caja que se abre es la de la propia sucursal, y una transferencia mueve stock de una sucursal a otra.
+
+\textbf{Qué pasa la primera vez que se entra.} Si la cuenta es nueva o se restableció la contraseña, el sistema obliga a cambiar la contraseña antes de dejar hacer cualquier otra cosa.
+
+\section{Cobertura}
+\label{sec:mu-cobertura}
+
+Este manual cubre todas las zonas del menú (General, Atención, Óptica, Comercial, Gestión) y sus pantallas, más los cuatro flujos de trabajo completos.
+
+Pantallas documentadas:
+\begin{itemize}
+  \item General: Panel de Control, Notificaciones, Mis Turnos, Mi Historial, Mis Recetas.
+  \item Atención: Pacientes (lista, alta rápida, página de alta y ficha de detalle), Clientes, Agenda, Recepción, Consultas (lista, formulario de alta, edición), Historial Clínico.
+  \item Óptica: Productos, Categorías, Marcas, Modelos, Tipos de Lente, Tratamientos, Niveles de Stock, Movimientos y su formulario, Motivos, Aprobaciones de movimientos, Registrar Conteo, Historial de Inventario, revisión de inventario, Transferencias.
+  \item Comercial: Proveedores, Órdenes de Compra (lista, formulario, detalle, aprobación), Facturas de Compra (lista, formulario, detalle), Recepciones (lista, formulario, detalle), Reportes de Compras, Egresos (lista, nuevo, aprobación, pagos, registrar pago, categorías de gasto), Clientes, Timbrados, Servicios, Presupuestos, Nueva Venta, Lista de Ventas, Detalle de Venta, Cobros Pendientes, Cobrar, Emitir documento, Facturas de Venta, Laboratorio (pedidos, aprobaciones, envíos y recepciones, facturas), Caja (apertura y cierre, historial, aprobaciones).
+  \item Gestión: Reportes (hub, citas, ventas, inventario, operativos), Profesionales, Empleados, Cargos, Especialidades, Usuarios, Roles y Permisos, Configuración, Sucursales, Ubicaciones, Auditoría.
+  \item Autenticación: ingreso, cambio de contraseña obligatorio, recuperar contraseña, verificar email, confirmar turno, registro de pacientes, cerrar sesión.
+\end{itemize}
+
+Pantallas que no se pudieron documentar como funcionales:
+\begin{itemize}
+  \item La pestaña Ventas dentro de la ficha del paciente figura como ``Pronto'' / ``En desarrollo''.
+  \item En la pantalla de ingreso aparece un botón Entrar con Google que, según el código, no tiene una acción conectada; por eso no se documenta como funcional.
+\end{itemize}
+
+Aclaraciones sobre los límites de esta verificación:
+\begin{itemize}
+  \item Los roles y permisos se tomaron tal cual están definidos en el sistema. De fábrica existen tres roles: Administrador, Profesional y Paciente. Cualquier otro rol (Recepcionista, Vendedor, Cajero, etc.) es un rol a medida que crea el Administrador; sus permisos exactos dependen de cómo lo configure cada óptica, por lo que no se pueden documentar de antemano.
+  \item El paso de un turno a Completado y el cierre de una consulta se hacen por cambio de estado del usuario; el sistema no encadena automáticamente uno con otro.
+\end{itemize}

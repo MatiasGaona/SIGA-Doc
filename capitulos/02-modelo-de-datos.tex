@@ -1,0 +1,558 @@
+\chapter{Modelo de Datos}
+\label{sec:modelo-datos}
+
+Este capítulo describe el esquema de la base de datos de SIGA tal como lo define el código (\code{SIGA.}\allowbreak \code{Domain/}\allowbreak \code{Entities} + \code{SIGA.}\allowbreak \code{Infrastructure/}\allowbreak \code{Persistence/}\allowbreak \code{Configurations}).
+
+Los diagramas usan el \textbf{nombre de la clase C\#} (PascalCase) como identificador de entidad, no el nombre físico de la tabla. Postgres usa snake\_case (confirmado vía \code{builder.}\allowbreak \code{ToTable(".}\allowbreak \code{.}\allowbreak \code{.}\allowbreak \code{")} para varias entidades --- ej. \code{Egreso}$\to$\code{egresos}, \code{Cliente}$\to$\code{clientes}, \code{Venta}$\to$\code{ventas}, \code{TrabajoPedido}$\to$\code{trabajos_pedido}); para el resto, asumir la misma convención pero confirmar contra el \code{*Configuration.cs} puntual antes de escribir SQL a mano.
+
+Cada diagrama muestra PK, FK y los campos de negocio más relevantes de cada entidad --- no todos los campos; el detalle completo está en el diccionario de datos que sigue a cada grupo. El esquema físico es \textbf{uno solo}; se divide en diagramas más chicos únicamente por legibilidad (69 entidades en un solo ER es ilegible en una página impresa), no porque sean bases de datos separadas. Las entidades marcadas con un asterisco (*) en un diagrama ya aparecieron completas en un diagrama anterior --- se repiten como referencia de conexión, sin repetir su lista de campos.
+
+Convención transversal no repetida en cada entidad: la gran mayoría tiene \code{CreatedAt} (\code{DateTime}) y muchas \code{UpdatedAt}; varias tienen \code{IsActive}/\code{Activo} (bool) para borrado lógico. Solo se listan explícitamente cuando su ausencia o comportamiento es relevante.
+
+\section{Grupo A --- Identidad, Personas y Personal}
+\label{sec:modelo-grupo-a}
+
+Todo lo relacionado a ``quién es quién'' en el sistema: autenticación, roles/permisos, y los distintos roles funcionales que puede tener una \code{Person} (paciente, profesional, cliente, empleado), más ubicaciones y sucursales.
+
+\subsection{Identidad y control de acceso (RBAC)}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (person) {\textbf{\textcolor{sigaAzul}{Person}} \nodepart{two}
+    Id (PK) \\ CI (UK) \\ FirstName \\ LastName \\ BirthDate \\ Sexo (nullable) \\ Email (nullable, UK)};
+  \node[entidad, right=of person] (user) {\textbf{\textcolor{sigaAzul}{User}} \nodepart{two}
+    Id (PK) \\ PersonId (FK, 1:1) \\ SucursalId (FK, nullable) \\ PasswordHash \\ IsActive \\ IsEmailVerified \\ MustChangePassword};
+  \node[entidad, below=of user] (userrole) {\textbf{\textcolor{sigaAzul}{UserRole}} \nodepart{two}
+    UserId (FK) \\ RoleId (FK)};
+  \node[entidad, right=of userrole] (role) {\textbf{\textcolor{sigaAzul}{Role}} \nodepart{two}
+    Id (PK) \\ Name (UK) \\ Type (nullable: admin\textbar professional\textbar patient)};
+  \node[entidad, below=of role] (roleperm) {\textbf{\textcolor{sigaAzul}{RolePermission}} \nodepart{two}
+    RoleId (FK) \\ PermissionId (FK)};
+  \node[entidad, left=of roleperm] (perm) {\textbf{\textcolor{sigaAzul}{Permission}} \nodepart{two}
+    Id (PK) \\ Name (UK)};
+
+  \draw[relacion] (person) -- node[above,font=\tiny]{1:1} (user);
+  \draw[relacion] (user) -- node[right,font=\tiny]{1:N} (userrole);
+  \draw[relacion] (userrole) -- node[above,font=\tiny]{N:1} (role);
+  \draw[relacion] (role) -- node[right,font=\tiny]{1:N} (roleperm);
+  \draw[relacion] (roleperm) -- node[above,font=\tiny]{N:1} (perm);
+\end{tikzpicture}
+\caption{Identidad y control de acceso basado en permisos (RBAC). El JWT emite permisos resueltos, no el nombre del rol --- ver Capítulo~\ref{sec:arch}, \S\ref{sec:arch-autorizacion}.}
+\label{fig:er-identidad-rbac}
+\end{figure}
+
+\subsection{Roles funcionales de una persona}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (person) {\textbf{\textcolor{sigaAzul}{Person}*} \nodepart{two} (ver Figura~\ref{fig:er-identidad-rbac})};
+  \node[entidad, right=of person] (user) {\textbf{\textcolor{sigaAzul}{User}*} \nodepart{two} (ver Figura~\ref{fig:er-identidad-rbac})};
+  \node[entidad, below=of person] (patient) {\textbf{\textcolor{sigaAzul}{Patient}} \nodepart{two}
+    Id (PK) \\ PersonId (FK, 1:1) \\ UserId (FK, nullable) \\ IsActive};
+  \node[entidad, below=of user] (professional) {\textbf{\textcolor{sigaAzul}{Professional}} \nodepart{two}
+    Id (PK) \\ UserId (FK, 1:1 obligatorio) \\ LicenseNumber};
+  \node[entidad, right=of user] (cliente) {\textbf{\textcolor{sigaAzul}{Cliente}} \nodepart{two}
+    Id (PK) \\ PersonId (FK, 1:1 único) \\ TipoFacturacion (enum) \\ RazonSocial (nullable) \\ RucCiFiscal (nullable) \\ IsActive};
+  \node[entidad, below=of professional] (empleado) {\textbf{\textcolor{sigaAzul}{Empleado}} \nodepart{two}
+    Id (PK) \\ UserId (FK) \\ CargoId (FK) \\ FechaIngreso \\ FechaEgreso (nullable) \\ SalarioBase (nullable)};
+  \node[entidad, right=of empleado] (cargo) {\textbf{\textcolor{sigaAzul}{CargoEmpleado}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Activo};
+
+  \draw[relacion] (person) -- node[left,font=\tiny]{1:1} (patient);
+  \draw[relacion] (user.south west) -- node[below,font=\tiny,pos=0.45]{1:1} (patient.north east);
+  \draw[relacion] (person) -- node[above,font=\tiny]{1:1} (user);
+  \draw[relacion] (user) -- node[left,font=\tiny]{1:1} (professional);
+  \draw[relacion] (person.north) to[out=65,in=115] node[above,font=\tiny]{1:1 (único)} (cliente.north);
+  \draw[relacion] (professional) -- node[left,font=\tiny]{1:1} (empleado);
+  \draw[relacion] (empleado) -- node[above,font=\tiny]{N:1} (cargo);
+\end{tikzpicture}
+\caption{Roles funcionales que puede tener una \texttt{Person}: \texttt{Patient} y \texttt{Cliente} cuelgan directo de \texttt{Person}; \texttt{Professional} y \texttt{Empleado} cuelgan de \texttt{User}. La línea \texttt{Professional}--\texttt{Empleado} es solo de layout (no hay FK real entre ambos --- son roles independientes que pueden coexistir en la misma \texttt{Person}).}
+\label{fig:er-roles-funcionales}
+\end{figure}
+
+\code{Professional} no tiene \code{PersonId} propio: llega a \code{Person} atravesando \code{User} (\code{Professional.}\allowbreak \code{User.}\allowbreak \code{PersonId}).
+
+\subsection{Personal: disponibilidad y sucursales}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (professional) {\textbf{\textcolor{sigaAzul}{Professional}*} \nodepart{two} (ver Figura~\ref{fig:er-roles-funcionales})};
+  \node[entidad, right=of professional] (esp) {\textbf{\textcolor{sigaAzul}{Especialidad}} \nodepart{two}
+    Id (PK) \\ Nombre};
+  \node[entidad, below=of professional] (profesp) {\textbf{\textcolor{sigaAzul}{Profesional\\Especialidad}} \nodepart{two}
+    ProfessionalId (FK) \\ EspecialidadId (FK)};
+  \node[entidad, below=of profesp] (horario) {\textbf{\textcolor{sigaAzul}{HorarioProfesional}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ ProfessionalId (FK) \\ DiaSemana \\ HoraInicio \\ HoraFin \\ Activo};
+  \node[entidad, right=of horario] (pausa) {\textbf{\textcolor{sigaAzul}{PausaHorario}} \nodepart{two}
+    Id (PK) \\ HorarioProfesionalId (FK) \\ HoraInicio \\ HoraFin};
+  \node[entidad, left=of horario] (bloqueo) {\textbf{\textcolor{sigaAzul}{BloqueoFecha}} \nodepart{two}
+    Id (PK) \\ ProfessionalId (FK) \\ Fecha};
+  \node[entidad, below=of horario] (sucursal) {\textbf{\textcolor{sigaAzul}{Sucursal}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Codigo (UK) \\ CiudadId (FK, nullable) \\ IsActive};
+  \node[entidad, right=of sucursal] (ciudad) {\textbf{\textcolor{sigaAzul}{Ciudad}} \nodepart{two}
+    Id (PK) \\ Nombre \\ DepartamentoId (FK)};
+  \node[entidad, below=of ciudad] (depto) {\textbf{\textcolor{sigaAzul}{Departamento}} \nodepart{two}
+    Id (PK) \\ Nombre};
+
+  \draw[relacion] (professional) -- node[above,font=\tiny]{N:N} (esp);
+  \draw[relacion] (professional) -- (profesp);
+  \draw[relacion] (esp) |- (profesp);
+  \begin{scope}[on background layer]
+  \draw[relacion] (professional) -- node[pos=0.62,left,font=\tiny]{1:N} (horario);
+  \end{scope}
+  \draw[relacion] (horario) -- node[above,font=\tiny]{1:N} (pausa);
+  \draw[relacion] (professional.west) -| node[pos=0.25,above,font=\tiny]{1:N} (bloqueo.north);
+  \draw[relacion] (sucursal) -- node[left,font=\tiny]{1:N} (horario);
+  \draw[relacion] (ciudad) -- node[above,font=\tiny]{1:N} (sucursal);
+  \draw[relacion] (depto) -- node[right,font=\tiny]{1:N} (ciudad);
+\end{tikzpicture}
+\caption{Disponibilidad del profesional para agenda (horarios por sucursal, pausas, bloqueos) y catálogo geográfico de Paraguay reutilizado por \texttt{Sucursal} y \texttt{Proveedor}.}
+\label{fig:er-personal-sucursales}
+\end{figure}
+
+\subsection{Diccionario de datos --- Grupo A}
+\label{sec:diccionario-grupo-a}
+
+\code{Person} --- núcleo de identidad. \code{CI} único, \code{Email} único y nullable (usado para login vía \code{User}, con \code{Are}\allowbreak \code{Nulls}\allowbreak \code{Distinct(true)}: coexisten muchas filas con \code{Email = NULL}). Toda persona del sistema (paciente, profesional, cliente, empleado, admin) tiene exactamente un \code{Person}. Ver \hyperref[adr:0001]{ADR 0001 --- Person como raíz de identidad}.
+
+\code{User} --- cuenta de acceso, 1:1 con \code{Person}. \code{SucursalId} nullable: \code{null} = usuario global (admin y pacientes); el resto del staff tiene una sucursal fija asignada desde el formulario de Profesional o de Empleado (no desde la pantalla de Usuarios, que solo gestiona roles + activar/desactivar).
+
+\code{Role} / \code{Permission} / \code{RolePermission} / \code{UserRole} --- autorización many-to-many pura. \code{Role.Type} (\code{admin}\textbar\code{professional}\textbar\code{patient}, nullable) es la única noción de rol ``de sistema'', usada solo para bootstrap/lookups internos --- la autorización de endpoints siempre pasa por permisos individuales, no por \code{Type} ni por \code{Role.Name}. Ver \hyperref[adr:0003]{ADR 0003 --- Autorización por permisos}.
+
+\code{Patient} --- marca que una \code{Person} es paciente. \code{UserId} nullable: puede existir sin cuenta de acceso (alta por recepción con solo CI/contacto); es \textbf{global} (sin \code{SucursalId} propio) --- elige sucursal al reservar cada turno.
+
+\code{Professional} --- siempre requiere \code{User} (1:1, obligatorio). \code{LicenseNumber} es la matrícula. La especialidad es many-to-many vía \code{Profesional}\allowbreak \code{Especialidad}.
+
+\code{Horario}\allowbreak \code{Profesional} / \code{PausaHorario} / \code{BloqueoFecha} --- disponibilidad del profesional para agenda. \code{Horario}\allowbreak \code{Profesional} es por sucursal (índice único \code{ProfessionalId}+\code{SucursalId}+\code{DiaSemana}). \code{BloqueoFecha} son excepciones puntuales (ej. vacaciones).
+
+\code{Cliente} --- siempre cuelga de \code{Person} (FK único \code{PersonId}). No es una entidad de facturación separada: \code{TipoFacturacion}+\code{RazonSocial}+\code{RucCiFiscal}+\code{Direccion}/\code{Email}/\code{Telefono} son solo el dato de facturación de esa persona como cliente. Un \code{Cliente} y un \code{Patient} pueden compartir el mismo \code{Person} sin relación directa entre sí.
+
+\code{Empleado} / \code{CargoEmpleado} --- capa de RR.HH. sobre \code{User} (1:1). \code{SalarioBase} nullable, usado por el módulo de Egresos (\code{SalarioEmpleado}, Grupo C).
+
+\code{Sucursal} / \code{Ciudad} / \code{Departamento} --- \code{Sucursal} es la unidad de scoping multi-sucursal (ver el capítulo de Arquitectura del Backend, § Multi-sucursal). \code{Ciudad}/\code{Departamento} son catálogo de ubicación geográfica de Paraguay.
+
+\clearpage
+\section{Grupo B --- Catálogo, Inventario, Clínica y Agenda}
+\label{sec:modelo-grupo-b}
+
+Todo lo que no es directamente ``dinero entrando o saliendo'': el catálogo de productos (incl. el catálogo óptico), el stock, la historia clínica y la agenda de turnos.
+
+\textbf{Decisión.} El cristal graduado a pedido no se modela como \code{Producto} con stock: se resuelve como \code{TipoLente} (clasificación) más una colección de \code{Tratamiento}s dentro del propio \code{TrabajoPedido}, y en \code{VentaLinea} la línea correspondiente usa \code{TipoLineaVenta.Lente = 2} (no descuenta stock). \code{CategoriaProducto.Tipo = Cristal} queda como valor legado del enum, sin ofrecerse en altas nuevas. Ver \hyperref[adr:0007]{ADR 0007}.
+
+\subsection{Catálogo de productos y catálogo óptico}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (catprod) {\textbf{\textcolor{sigaAzul}{CategoriaProducto}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Tipo (Generico \textbar\ Armazon \textbar\ Cristal, obsoleto) \\ Margen (\%) \\ Descuento (\%) \\ IsActive};
+  \node[entidad, right=of catprod] (producto) {\textbf{\textcolor{sigaAzul}{Producto}} \nodepart{two}
+    Id (PK) \\ Nombre \\ CategoriaProductoId (FK, nullable) \\ MarcaId / ModeloId (FK, nullable) \\ Sku (nullable) \\ PrecioCosto \\ PrecioVenta (derivado) \\ IsActive};
+  \node[entidad, above=of producto] (marca) {\textbf{\textcolor{sigaAzul}{Marca}} \nodepart{two}
+    Id (PK) \\ Nombre \\ IsActive};
+  \node[entidad, right=of marca] (modelo) {\textbf{\textcolor{sigaAzul}{Modelo}} \nodepart{two}
+    Id (PK) \\ Nombre \\ MarcaId (FK) \\ IsActive};
+  \node[entidad, right=of producto] (stockcfg) {\textbf{\textcolor{sigaAzul}{ProductoStockConfig}} \nodepart{two}
+    ProductoId (PK/FK, 1:1) \\ StockMinimo \\ StockMaximo (nullable)};
+  \node[entidad, below=of catprod] (tipolente) {\textbf{\textcolor{sigaAzul}{TipoLente}} \nodepart{two}
+    Id (PK) \\ Nombre \\ PrecioBase \\ IsActive};
+  \node[entidad, right=of tipolente] (tratamiento) {\textbf{\textcolor{sigaAzul}{Tratamiento}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Precio \\ IsActive};
+  \node[entidad, right=of tratamiento] (servicio) {\textbf{\textcolor{sigaAzul}{Servicio}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Precio \\ IsActive};
+  \node[entidad, below=of servicio] (srvtarifa) {\textbf{\textcolor{sigaAzul}{ServicioTarifa}} \nodepart{two}
+    Id (PK) \\ ServicioId (FK) \\ ProfessionalId (FK, nullable) \\ EspecialidadId (FK, nullable) \\ Precio};
+
+  \draw[relacion] (catprod) -- node[above,font=\tiny]{1:N} (producto);
+  \draw[relacion] (marca) -- node[left,font=\tiny]{1:N} (producto);
+  \draw[relacion] (marca) -- node[above,font=\tiny]{1:N} (modelo);
+  \draw[relacion] (modelo.south) -- ++(0,-0.4) -| (producto.north east);
+  \draw[relacion] (producto) -- node[above,font=\tiny]{1:1} (stockcfg);
+  \draw[relacion] (servicio) -- node[right,font=\tiny]{1:N} (srvtarifa);
+\end{tikzpicture}
+\caption{Catálogo de productos (armazones, accesorios, etc.), catálogo óptico (\texttt{TipoLente}/\texttt{Tratamiento}, sin stock propio) y catálogo de servicios con tarifas por profesional/especialidad. \texttt{TipoLente} y \texttt{Tratamiento} se consumen desde \texttt{TrabajoPedido} (Grupo C), no desde \texttt{Producto}.}
+\label{fig:er-catalogo-optico}
+\end{figure}
+
+\subsection{Inventario, stock y transferencias}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (producto) {\textbf{\textcolor{sigaAzul}{Producto}*} \nodepart{two} (ver Figura~\ref{fig:er-catalogo-optico})};
+  \node[entidad, right=of producto] (movstock) {\textbf{\textcolor{sigaAzul}{MovimientoStock}} \nodepart{two}
+    Id (PK) \\ ProductoId (FK) \\ SucursalId (FK) \\ Tipo (string: Entrada\textbar Salida) \\ Cantidad \\ MotivoMovimientoId (FK, nullable) \\ Estado (string)};
+  \node[entidad, above=of movstock] (motivo) {\textbf{\textcolor{sigaAzul}{MotivoMovimiento}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Tipo (Entrada\textbar Salida\textbar Ambos)};
+  \node[entidad, below=of producto] (lote) {\textbf{\textcolor{sigaAzul}{StockLote}} \nodepart{two}
+    Id (PK) \\ ProductoId (FK) \\ SucursalId (FK) \\ RecepcionItemId (FK) \\ Lote \\ FechaVencimiento (nullable)};
+  \node[entidad, right=of lote] (stockview) {\textbf{\textcolor{sigaAzul}{StockActualView}} \nodepart{two}
+    ProductoId (sin PK, vista) \\ SucursalId \\ StockActual};
+  \node[entidad, below=of lote] (conteo) {\textbf{\textcolor{sigaAzul}{ConteoInventario}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ Estado (string)};
+  \node[entidad, right=of conteo] (conteolinea) {\textbf{\textcolor{sigaAzul}{ConteoInventarioLinea}} \nodepart{two}
+    Id (PK) \\ ConteoId (FK) \\ ProductoId (FK) \\ CantidadSistema \\ CantidadFisica \\ Diferencia};
+  \node[entidad, right=of movstock] (transf) {\textbf{\textcolor{sigaAzul}{TransferenciaStock}} \nodepart{two}
+    Id (PK) \\ SucursalOrigenId (FK) \\ SucursalDestinoId (FK) \\ Fecha \\ Estado (string)};
+  \node[entidad, below=of transf] (transfitem) {\textbf{\textcolor{sigaAzul}{TransferenciaStockItem}} \nodepart{two}
+    Id (PK) \\ TransferenciaStockId (FK) \\ ProductoId (FK) \\ Cantidad};
+
+  \draw[relacion] (producto) -- node[above,font=\tiny]{1:N} (movstock);
+  \draw[relacion] (motivo) -- node[right,font=\tiny]{1:N} (movstock);
+  \draw[relacion] (producto) -- node[left,font=\tiny]{1:N} (lote);
+  \begin{scope}[on background layer]
+  \draw[relacion] (producto) -- node[pos=0.12,right,font=\tiny]{1:N} (conteolinea);
+  \draw[relacion] (producto) -- (transfitem);
+  \end{scope}
+  \draw[relacion] (conteo) -- node[above,font=\tiny]{1:N} (conteolinea);
+  \draw[relacion] (transf) -- node[right,font=\tiny]{1:N} (transfitem);
+\end{tikzpicture}
+\caption{El stock no es un campo de \texttt{Producto}: se deriva sumando \texttt{MovimientoStock} filtrados por \texttt{Estado="Aprobado"}. \texttt{StockActualView} mapea la vista SQL \texttt{vw\_stock\_actual} (sin PK, \texttt{HasNoKey()}). \texttt{TransferenciaStock} mueve stock entre dos sucursales con flujo de aprobación.}
+\label{fig:er-inventario-stock}
+\end{figure}
+
+\subsection{Clínica: consultas y recetas}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (consulta) {\textbf{\textcolor{sigaAzul}{ConsultaClinica}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ PatientId (FK) \\ ProfessionalId (FK) \\ CitaId (nullable, SIN FK) \\ EstadoConfigId (FK, nullable) \\ FechaConsulta \\ Motivo \\ DiagnosticoPrincipal};
+  \node[entidad, right=of consulta] (receta) {\textbf{\textcolor{sigaAzul}{Receta}} \nodepart{two}
+    Id (PK) \\ ConsultaClinicaId (FK, nullable, 1:1) \\ PersonId (FK, nullable) \\ FechaEmision \\ OD/OI: Esferico, Cilindro, Eje, Adicion};
+  \node[entidad, below=of consulta] (patient) {\textbf{\textcolor{sigaAzul}{Patient}*} \nodepart{two} (ver Figura~\ref{fig:er-roles-funcionales})};
+  \node[entidad, right=of patient] (prof) {\textbf{\textcolor{sigaAzul}{Professional}*} \nodepart{two} (ver Figura~\ref{fig:er-roles-funcionales})};
+  \node[entidad, right=of receta] (person) {\textbf{\textcolor{sigaAzul}{Person}*} \nodepart{two} (ver Figura~\ref{fig:er-identidad-rbac})};
+  \node[entidad, above=of consulta] (estcfg) {\textbf{\textcolor{sigaAzul}{EstadoConfig}} \nodepart{two}
+    Id (PK) \\ Entidad (Turno\textbar Pedido\textbar Consulta) \\ Nombre \\ Color \\ EsProtegido};
+
+  \draw[relacion] (patient) -- node[left,font=\tiny]{1:N} (consulta);
+  \draw[relacion] (prof) -- node[below,font=\tiny]{1:N} (consulta);
+  \draw[relacion] (consulta) -- node[above,font=\tiny]{1:1 opc.} (receta);
+  \draw[relacion] (person) -- node[above,font=\tiny]{receta externa} (receta);
+  \draw[relacion] (estcfg) -- node[right,font=\tiny]{1:N} (consulta);
+\end{tikzpicture}
+\caption{\texttt{ConsultaClinica} y su receta óptica opcional. Una \texttt{Receta} puede originarse en una consulta (1:1, Cascade) o cargarse manual para una \texttt{Person} sin consulta previa (receta ``externa''). \texttt{EstadoConfigId} es un estado cosmético/configurable, no reemplaza ningún enum.}
+\label{fig:er-clinica}
+\end{figure}
+
+\subsection{Agenda: turnos}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (turno) {\textbf{\textcolor{sigaAzul}{Turno}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ ProfessionalId (FK) \\ PatientId (FK) \\ FechaHora \\ Estado (enum TurnoEstado) \\ EstadoCustomId (FK, nullable) \\ SolicitudCancelacion};
+  \node[entidad, below=of turno] (patient) {\textbf{\textcolor{sigaAzul}{Patient}*} \nodepart{two} (ver Figura~\ref{fig:er-roles-funcionales})};
+  \node[entidad, left=of patient] (prof) {\textbf{\textcolor{sigaAzul}{Professional}*} \nodepart{two} (ver Figura~\ref{fig:er-roles-funcionales})};
+  \node[entidad, right=of patient] (estcfg) {\textbf{\textcolor{sigaAzul}{EstadoConfig}*} \nodepart{two} (ver Figura~\ref{fig:er-clinica})};
+
+  \draw[relacion] (prof) -- node[left,font=\tiny]{1:N} (turno);
+  \draw[relacion] (patient) -- node[right,font=\tiny]{1:N} (turno);
+  \draw[relacion] (estcfg) -- node[right,font=\tiny]{cosmético} (turno);
+\end{tikzpicture}
+\caption{\texttt{Turno.Estado} es el enum real que gobierna la lógica de negocio; \texttt{EstadoCustomId} es puramente cosmético/configurable (color, nombre visible), no lo reemplaza.}
+\label{fig:er-agenda-turnos}
+\end{figure}
+
+\subsection{Diccionario de datos --- Grupo B}
+\label{sec:diccionario-grupo-b}
+
+\code{Producto} --- \code{PrecioVenta} \textbf{siempre se deriva} de \code{PrecioCosto} $\times$ (1 + \code{CategoriaProducto.}\allowbreak \code{Margen}/100), nunca se carga a mano (centralizado en \code{Producto.}\allowbreak \code{AplicarCosto}). Ver \hyperref[adr:0004]{ADR 0004}. \code{Categoria} (string) es un campo legado que matchea \code{CategoriaProducto.}\allowbreak \code{Nombre} por texto --- el FK real \code{Categoria}\allowbreak \code{Producto}\allowbreak \code{Id} existe pero conviven ambos.
+
+\code{Producto}\allowbreak \code{Stock}\allowbreak \code{Config} --- mín/máx de stock, 1:1 con \code{Producto}, \textbf{global} (no por sucursal) --- decisión de diseño explícita para no invalidar la relación 1:1 durante la migración multi-sucursal.
+
+\code{MovimientoStock} / \code{StockActualView} --- el stock no es un campo de \code{Producto}; se deriva sumando movimientos (\code{Entrada}+, \code{Salida}$-$) filtrados por \code{Estado = "Aprobado"}. Ver \hyperref[adr:0002]{ADR 0002 --- Stock derivado de movimientos}.
+
+\code{StockLote} / \code{ConteoInventario} --- trazabilidad de lotes con vencimiento (originados en una recepción de mercadería) y conteos físicos periódicos con diferencia sistema-vs-físico por sucursal.
+
+\code{Transferencia}\allowbreak \code{Stock} / \code{Transferencia}\allowbreak \code{Stock}\allowbreak \code{Item} --- flujo de aprobación: crear = \code{Salida} en origen (\code{Pendiente}); aceptar = \code{Entrada} en destino; rechazar = \code{Entrada} de vuelta al origen. Solo la sucursal destino gestiona la aceptación/rechazo.
+
+\code{Receta} --- puede originarse en una \code{ConsultaClinica} (1:1, Cascade) o cargarse manualmente para una \code{Person} sin consulta previa (\code{PersonId}, receta ``externa''). Ambos FKs son nullable. Ver \hyperref[adr:0008]{ADR 0008 --- Receta clínica o externa}.
+
+\clearpage
+\section{Grupo C --- Comercial: Ventas, Laboratorio, Compras, Caja y Egresos}
+\label{sec:modelo-grupo-c}
+
+Todo lo que mueve dinero o compromisos comerciales --- el grupo más grande del modelo (27 entidades).
+
+\subsection{Ventas}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (cliente) {\textbf{\textcolor{sigaAzul}{Cliente}*} \nodepart{two} (ver Figura~\ref{fig:er-roles-funcionales})};
+  \node[entidad, right=of cliente] (venta) {\textbf{\textcolor{sigaAzul}{Venta}} \nodepart{two}
+    Id (PK) \\ NumeroComprobante \\ SucursalId (FK) \\ ClienteId (FK, nullable=Consumidor Final) \\ VendedorId (FK, nullable) \\ RecetaId (FK, nullable) \\ Estado (enum EstadoVenta) \\ Tipo (Directa\textbar TrabajoAPedido) \\ CondicionVenta \\ FechaVenta \\ ValidezDias (default 15) \\ CantidadCuotas (nullable) \\ FrecuenciaCuotasDias (nullable)};
+  \node[entidad, right=of venta] (ventalinea) {\textbf{\textcolor{sigaAzul}{VentaLinea}} \nodepart{two}
+    Id (PK) \\ VentaId (FK) \\ Tipo (Producto\textbar Servicio\textbar Lente) \\ ProductoId/ServicioId (FK, nullable) \\ Cantidad \\ PrecioUnitario \\ CategoriaFiscal (enum)};
+  \node[entidad, below=of venta] (cobro) {\textbf{\textcolor{sigaAzul}{Cobro}} \nodepart{two}
+    Id (PK) \\ VentaId (FK) \\ Tipo (Seña\textbar Cuota) \\ MontoTotal \\ Anulado \\ RegistradoPorId (FK)};
+  \node[entidad, right=of cobro] (cobrolinea) {\textbf{\textcolor{sigaAzul}{CobroLinea}} \nodepart{two}
+    Id (PK) \\ CobroId (FK) \\ MetodoPago (enum) \\ Monto};
+
+  \draw[relacion] (cliente) -- node[above,font=\tiny]{1:N} (venta);
+  \draw[relacion] (venta) -- node[above,font=\tiny]{1:N} (ventalinea);
+  \draw[relacion] (venta) -- node[left,font=\tiny]{1:N} (cobro);
+  \draw[relacion] (cobro) -- node[above,font=\tiny]{1:N} (cobrolinea);
+\end{tikzpicture}
+\caption{\texttt{Venta} es la cabecera única para venta directa y presupuesto/venta a pedido. Un \texttt{Cobro} puede tener varias \texttt{CobroLinea} (métodos de pago combinados).}
+\label{fig:er-ventas}
+\end{figure}
+
+\textbf{Decisión.} \code{EstadoVenta} recorre Borrador$\to$Confirmada$\to$ListaParaCobrar$\to$ComprobanteEmitido (o Cancelada en cualquier punto): toda venta confirmada, directa o a pedido, pasa directo a \code{ListaParaCobrar}, mientras el ciclo del laboratorio corre en paralelo sin bloquear el cobro --- ver \hyperref[adr:0006]{ADR 0006}. Los totales (\code{Total}, \code{MontoSeña}, \code{TotalCobrado}, \code{SaldoPendiente}) son propiedades calculadas en memoria, no columnas.
+
+\textbf{Decisión.} Una venta a crédito guarda su plan de cuotas como dos números en la propia cabecera --- \code{CantidadCuotas} y \code{FrecuenciaCuotasDias} --- en vez de materializar una tabla de cuotas con su vencimiento y su estado. Todo lo que el plan necesita se deriva de esos dos campos más los \code{Cobro} ya registrados: \code{MontoCuota}, \code{CuotasPagadas}, \code{ProximaCuotaVencimiento} y \code{CuotaVencida} son propiedades calculadas, del mismo modo que los totales. Es el mismo criterio que gobierna el stock (\hyperref[adr:0002]{ADR 0002}): no guardar como dato lo que puede derivarse de los movimientos, para que no exista la posibilidad de que ambos queden en desacuerdo.
+
+\subsection{Comprobantes, facturación y devoluciones}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (venta) {\textbf{\textcolor{sigaAzul}{Venta}*} \nodepart{two} (ver Figura~\ref{fig:er-ventas})};
+  \node[entidad, right=of venta] (facturaventa) {\textbf{\textcolor{sigaAzul}{FacturaVenta}} \nodepart{two}
+    Id (PK) \\ VentaId (FK, 1:1) \\ NumeroFactura \\ TimbradoId (FK, nullable) \\ MontoExento / Gravado5 / Gravado10};
+  \node[entidad, above=of facturaventa] (timbrado) {\textbf{\textcolor{sigaAzul}{Timbrado}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ NumeroTimbrado \\ UltimoNumero \\ FechaInicio/FinVigencia};
+  \node[entidad, below=of venta] (comprobante) {\textbf{\textcolor{sigaAzul}{Comprobante}} \nodepart{two}
+    Id (PK) \\ VentaId (FK, 1:1) \\ Tipo (ReciboSimple) \\ Estado (Emitido\textbar Anulado) \\ EmitidoPorId (FK)};
+  \node[entidad, below=of comprobante] (devolucion) {\textbf{\textcolor{sigaAzul}{Devolucion}} \nodepart{two}
+    Id (PK) \\ VentaId (FK) \\ Tipo (Devolucion\textbar Cambio) \\ Estado \\ SolicitadoPorId (FK) \\ ConfirmadoPorId (FK, nullable)};
+  \node[entidad, right=of devolucion] (devlinea) {\textbf{\textcolor{sigaAzul}{DevolucionLinea}} \nodepart{two}
+    Id (PK) \\ DevolucionId (FK) \\ ProductoDevueltoId (FK) \\ CantidadDevuelta \\ ProductoNuevoId (FK, nullable, cambio)};
+  \node[entidad, right=of comprobante] (notacredito) {\textbf{\textcolor{sigaAzul}{NotaCredito}} \nodepart{two}
+    Id (PK) \\ DevolucionId (FK, 1:1) \\ VentaId (FK) \\ FacturaVentaId (FK) \\ NumeroNotaCredito \\ TimbradoId (FK, nullable)};
+
+  \draw[relacion] (venta) -- node[above,font=\tiny]{1:1} (facturaventa);
+  \draw[relacion] (timbrado) -- node[right,font=\tiny]{1:N} (facturaventa);
+  \draw[relacion] (venta) -- node[left,font=\tiny]{1:1} (comprobante);
+  \begin{scope}[on background layer]
+  \draw[relacion] (venta) -- node[pos=0.72,left,font=\tiny]{1:N} (devolucion);
+  \draw[relacion] (facturaventa) -- node[pos=0.5,right,font=\tiny,fill=white,inner sep=1pt]{1:N} (notacredito);
+  \draw[relacion] (devolucion) -- node[pos=0.35,below,font=\tiny,fill=white,inner sep=1pt]{1:1} (notacredito);
+  \end{scope}
+  \draw[relacion] (devolucion) -- node[above,font=\tiny]{1:N} (devlinea);
+\end{tikzpicture}
+\caption{\texttt{FacturaVenta} y \texttt{Comprobante} son dos documentos distintos, ambos 1:1 con \texttt{Venta} (Cascade). \texttt{FacturaVenta} está ligada a un \texttt{Timbrado} vigente de la sucursal. Una \texttt{Devolucion} confirmada sobre una venta facturada genera una \texttt{NotaCredito} (1:1), numerada con un \texttt{Timbrado} propio de tipo \texttt{NotaCredito}.}
+\label{fig:er-comprobantes}
+\end{figure}
+
+\subsection{Laboratorio óptico}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (venta) {\textbf{\textcolor{sigaAzul}{Venta}*} \nodepart{two} (ver Figura~\ref{fig:er-ventas})};
+  \node[entidad, right=of venta] (tp) {\textbf{\textcolor{sigaAzul}{TrabajoPedido}} \nodepart{two}
+    Id (PK) \\ VentaId (FK, 1:1 único) \\ RecetaId (FK, nullable) \\ TipoLenteId (FK, nullable) \\ ArmazonProductoId (FK, nullable) \\ ArmazonDelCliente \\ LaboratorioProveedorId (FK, nullable) \\ Estado (enum) \\ MedioEnvio (enum, nullable) \\ AprobadoPorId (FK, nullable)};
+  \node[entidad, right=of tp] (facturalab) {\textbf{\textcolor{sigaAzul}{FacturaLaboratorio}} \nodepart{two}
+    Id (PK) \\ TrabajoPedidoId (FK, 1:1) \\ NumeroFactura \\ Monto \\ EmitidoPorId (FK)};
+  \node[entidad, below=of tp] (proveedor) {\textbf{\textcolor{sigaAzul}{Proveedor}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Ruc \\ CiudadId (FK, nullable) \\ EsLaboratorio \\ IsActive};
+
+  \draw[relacion] (venta) -- node[above,font=\tiny]{1:1} (tp);
+  \draw[relacion] (tp) -- node[above,font=\tiny]{1:1} (facturalab);
+  \draw[relacion] (proveedor) -- node[left,font=\tiny]{laboratorio externo} (tp);
+\end{tikzpicture}
+\caption{\texttt{TrabajoPedido} es el núcleo del flujo ``óptica a pedido''. El mismo catálogo de \texttt{Proveedor} sirve tanto para compras de mercadería como para laboratorios ópticos externos (\texttt{EsLaboratorio}).}
+\label{fig:er-laboratorio}
+\end{figure}
+
+\textbf{Decisión.} \code{TrabajoPedido.}\allowbreak \code{Estado} incluye \code{Borrador} para la configuración óptica de un presupuesto aún no confirmado, que no entra a la cola del laboratorio hasta que la venta se confirma. \code{Armazon}\allowbreak \code{Del}\allowbreak \code{Cliente=true} permite un trabajo sin \code{ArmazonProductoId} cuando el cliente trae su propio armazón. Ver \hyperref[adr:0005]{ADR 0005} y \hyperref[adr:0007]{ADR 0007}.
+
+\subsection{Compras y proveedores}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (proveedor) {\textbf{\textcolor{sigaAzul}{Proveedor}*} \nodepart{two} (ver Figura~\ref{fig:er-laboratorio})};
+  \node[entidad, above=of proveedor] (contacto) {\textbf{\textcolor{sigaAzul}{ProveedorContacto}} \nodepart{two}
+    Id (PK) \\ ProveedorId (FK) \\ Nombre};
+  \node[entidad, right=of proveedor] (pedido) {\textbf{\textcolor{sigaAzul}{PedidoProveedor}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ ProveedorId (FK) \\ Estado (enum EstadoPedido) \\ FechaOrden (nullable)};
+  \node[entidad, above=of pedido] (pedidoitem) {\textbf{\textcolor{sigaAzul}{PedidoProveedorItem}} \nodepart{two}
+    Id (PK) \\ PedidoProveedorId (FK) \\ ProductoId (FK) \\ Cantidad \\ CantidadRecibida \\ PrecioUnitario};
+  \node[entidad, right=of pedido] (recepcion) {\textbf{\textcolor{sigaAzul}{RecepcionMercaderia}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ PedidoProveedorId (FK) \\ FacturaCompraId (FK, nullable) \\ FechaRecepcion \\ UserId (FK)};
+  \node[entidad, above=of recepcion] (recepitem) {\textbf{\textcolor{sigaAzul}{Recepcion\\Mercaderia\\Item}} \nodepart{two}
+    Id (PK) \\ RecepcionId (FK) \\ PedidoItemId (FK) \\ Cantidad \\ Lote (nullable)};
+  \node[entidad, below=of pedido] (devprov) {\textbf{\textcolor{sigaAzul}{DevolucionProveedor}} \nodepart{two}
+    Id (PK) \\ PedidoProveedorId (FK) \\ PedidoProveedorItemId (FK) \\ Cantidad \\ Motivo};
+
+  \draw[relacion] (proveedor) -- node[left,font=\tiny]{1:N} (contacto);
+  \draw[relacion] (proveedor) -- node[above,font=\tiny]{1:N} (pedido);
+  \draw[relacion] (pedido) -- node[left,font=\tiny]{1:N} (pedidoitem);
+  \draw[relacion] (pedido) -- node[above,font=\tiny]{1:N} (recepcion);
+  \draw[relacion] (recepcion) -- node[left,font=\tiny]{1:N} (recepitem);
+  \draw[relacion] (pedido) -- node[left,font=\tiny]{1:N} (devprov);
+\end{tikzpicture}
+\caption{Ciclo de compras: OC (\texttt{PedidoProveedor}, Borrador $\to$ Confirmada $\to$ RecibidaParcial/Total $\to$ Facturada, o Cancelada) $\to$ una o más recepciones parciales $\to$ factura del proveedor opcional (ver Figura~\ref{fig:er-egresos}).}
+\label{fig:er-compras}
+\end{figure}
+
+\subsection{Egresos --- herencia TPH}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  % Los 5 subtipos van apilados en una columna (no en fila): asi la figura
+  % entra en el ancho de la pagina y la jerarquia TPH se lee de izquierda
+  % (clase base) a derecha (subtipos y lo que cuelga de ellos).
+  \node[entidad] (facturacompra) {\textbf{\textcolor{sigaAzul}{FacturaCompra}} \nodepart{two}
+    ProveedorId (FK) \\ PedidoProveedorId (FK, nullable) \\ NroFactura (nullable) \\ CondicionVenta (enum)};
+  \node[entidad, below=0.5cm of facturacompra] (honorario) {\textbf{\textcolor{sigaAzul}{Honorario}} \nodepart{two}
+    ProfessionalId (FK) \\ Periodo (nullable)};
+  \node[entidad, below=0.5cm of honorario] (gastogen) {\textbf{\textcolor{sigaAzul}{GastoGeneral}} \nodepart{two}
+    CategoriaGastoId (FK)};
+  \node[entidad, below=0.5cm of gastogen] (salario) {\textbf{\textcolor{sigaAzul}{SalarioEmpleado}} \nodepart{two}
+    EmpleadoId (FK) \\ Periodo (nullable)};
+  \node[entidad, below=0.5cm of salario] (egfaclab) {\textbf{\textcolor{sigaAzul}{Egreso\allowbreak Factura\allowbreak Laboratorio}} \nodepart{two}
+    FacturaLaboratorioId (FK)};
+
+  \node[entidad, left=of gastogen] (egreso) {\textbf{\textcolor{sigaAzul}{Egreso}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ RegistradoPorId (FK, nullable) \\ Tipo (enum TipoEgreso --- discriminador) \\ Estado (enum EstadoEgreso) \\ Monto \\ Concepto \\ FechaEmision / Vencimiento / Pago \\ MetodoPago (nullable) \\ PagoExterno};
+
+  \node[entidad, right=of facturacompra] (facturaitem) {\textbf{\textcolor{sigaAzul}{FacturaCompraItem}} \nodepart{two}
+    Id (PK) \\ FacturaCompraId (FK) \\ ProductoId (FK, nullable) \\ Cantidad \\ PrecioUnitario \\ TipoIva (enum)};
+  \node[entidad, right=of gastogen] (categoriagasto) {\textbf{\textcolor{sigaAzul}{CategoriaGasto}} \nodepart{two}
+    Id (PK) \\ Nombre \\ Activo};
+
+  \draw[relacion] (egreso.east) -- node[above,font=\tiny,pos=0.7]{TPH} (facturacompra.west);
+  \draw[relacion] (egreso.east) -- (honorario.west);
+  \draw[relacion] (egreso.east) -- (gastogen.west);
+  \draw[relacion] (egreso.east) -- (salario.west);
+  \draw[relacion] (egreso.east) -- node[below,font=\tiny,pos=0.7]{TPH} (egfaclab.west);
+  \draw[relacion] (facturacompra) -- node[above,font=\tiny]{1:N} (facturaitem);
+  \draw[relacion] (categoriagasto) -- node[above,font=\tiny]{1:N} (gastogen);
+\end{tikzpicture}
+\caption{\texttt{Egreso} es la clase base abstracta (Table-Per-Hierarchy) de toda salida de dinero, mapeada a una única tabla física \texttt{egresos} con columna discriminadora \texttt{Tipo}. Los 5 subtipos solo agregan 1-3 columnas específicas y comparten todo el resto de la base. Ver \hyperref[adr:0011]{ADR 0011 --- Egreso como jerarquía TPH}.}
+\label{fig:er-egresos}
+\end{figure}
+
+\subsection{Caja}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 1.8cm]
+  \node[entidad] (sesion) {\textbf{\textcolor{sigaAzul}{SesionCaja}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ Estado (\allowbreak Abierta\textbar\allowbreak Cerrada\textbar\allowbreak PendienteAprobacion) \\ MontoInicial \\ AbiertaPorId (FK) \\ EfectivoContado/\allowbreak Esperado (nullable) \\ Diferencia (nullable)};
+  \node[entidad, right=of sesion] (movcaja) {\textbf{\textcolor{sigaAzul}{MovimientoCaja}} \nodepart{two}
+    Id (PK) \\ SucursalId (FK) \\ Tipo (Ingreso\textbar Egreso) \\ Monto \\ MetodoPago (enum) \\ VentaId (FK, nullable) \\ EgresoId (FK, nullable) \\ SesionCajaId (FK, nullable)};
+  \node[entidad, above=of movcaja] (venta) {\textbf{\textcolor{sigaAzul}{Venta}*} \nodepart{two} (ver Figura~\ref{fig:er-ventas})};
+  \node[entidad, below=of movcaja] (egreso) {\textbf{\textcolor{sigaAzul}{Egreso}*} \nodepart{two} (ver Figura~\ref{fig:er-egresos})};
+
+  \draw[relacion] (sesion) -- node[above,font=\tiny]{1:N} (movcaja);
+  \draw[relacion] (venta) -- node[right,font=\tiny]{ingreso contado} (movcaja);
+  \draw[relacion] (egreso) -- node[right,font=\tiny]{pago} (movcaja);
+\end{tikzpicture}
+\caption{\texttt{SesionCaja} es ``una caja abierta por sucursal a la vez''; cierre con conteo físico vs. esperado y flujo de aprobación si hay diferencia. Cada \texttt{MovimientoCaja} se origina en una \texttt{Venta}, un \texttt{Egreso}, o es manual.}
+\label{fig:er-caja}
+\end{figure}
+
+\subsection{Diccionario de datos --- Grupo C}
+\label{sec:diccionario-grupo-c}
+
+\code{VentaLinea} --- \code{Tipo = Lente} es la línea de un cristal graduado a pedido (no descuenta stock). \code{CategoriaFiscal} por línea permite mezclar ítems con distinto tratamiento de IVA paraguayo en la misma venta.
+
+\code{Cobro} / \code{CobroLinea} --- un \code{Cobro} puede tener múltiples \code{CobroLinea} (métodos de pago combinados, ej. parte efectivo + parte tarjeta). \code{Tipo} distingue seña (venta a crédito, primer pago) de cuota (pagos siguientes).
+
+\code{Proveedor.}\allowbreak \code{EsLaboratorio} --- el mismo catálogo de proveedores sirve tanto para compras de mercadería como para laboratorios ópticos externos; \code{TrabajoPedido.}\allowbreak \code{LaboratorioProveedorId} filtra por este flag.
+
+\code{PedidoProveedor} $\to$ \code{Recepcion}\allowbreak \code{Mercaderia} $\to$ \code{FacturaCompra} --- ciclo de compras completo: se crea la OC, se registran una o más recepciones parciales (cada una con sus ítems, que pueden generar \code{StockLote}), y opcionalmente se registra la factura del proveedor (ligada o no a la OC vía \code{PedidoProveedorId} nullable).
+
+\code{NotaCredito} --- documento fiscal que compensa una \code{FacturaVenta} por el valor de lo devuelto; \textbf{no} anula la factura original, la referencia. Nace 1:1 con la \code{Devolucion} que la origina (índice único sobre \code{DevolucionId}), y solo si la venta se cerró con factura --- una devolución sobre una venta con recibo simple no genera nota de crédito. Los montos se guardan desglosados por categoría fiscal (\code{Monto}\allowbreak \code{Exento} / \code{Monto}\allowbreak \code{Gravado5} / \code{Monto}\allowbreak \code{Gravado10}), y el IVA y el total se derivan en la entidad sin persistirse, mismo criterio que \code{FacturaVenta}.
+
+\code{Timbrado.Tipo} --- discrimina la serie fiscal: un timbrado numera facturas o notas de crédito, nunca ambas. Cada sucursal necesita entonces al menos un timbrado activo de cada tipo para poder facturar y devolver.
+
+\code{Egreso} --- ver Figura~\ref{fig:er-egresos}: \code{FacturaCompra : Egreso} no es un error de modelado --- una factura de compra a proveedor \emph{es} (no ``tiene'') un egreso.
+
+\code{MovimientoCaja} / \code{SesionCaja} --- cada \code{MovimientoCaja} puede originarse en una \code{Venta} (cobro), un \code{Egreso} (pago) o ser manual, y siempre pertenece a una \code{SesionCaja}.
+
+\section{Entidades transversales}
+\label{sec:modelo-transversales}
+
+\code{Configuracion}\allowbreak \code{Negocio} --- fila única (singleton lógico) con los datos fiscales/de contacto del negocio (\code{NombreFantasia}, \code{RazonSocial}, \code{RUC}, etc.), usada por generación de PDFs y comprobantes. Sin FKs.
+
+\code{Notificacion}\allowbreak \code{Interna} --- centro de notificaciones internas al staff. Destinatario por \code{Destinatario}\allowbreak \code{Usuario}\allowbreak \code{Id} (individual, nullable), \code{Destinatario}\allowbreak \code{Sucursal}\allowbreak \code{Id} (broadcast a staff de esa sucursal, nullable) o ambos null (broadcast global). \code{EntidadOrigenTipo}/\code{EntidadOrigenId} referencian polimórficamente la entidad que disparó la notificación (sin FK real --- referencia débil por diseño). \code{Leido} es un único flag compartido para notificaciones de broadcast, no por-usuario. Ver \hyperref[adr:0010]{ADR 0010}.
+
+\code{Registro}\allowbreak \code{Auditoria} --- bitácora \emph{append-only} de operaciones sensibles (tabla \code{registros_}\allowbreak \code{auditoria}). Es la única entidad del modelo \textbf{sin ninguna propiedad de navegación}: guarda un snapshot legible del autor (\code{Usuario}\allowbreak \code{Nombre}) en vez de una FK a \code{User}, para que el historial siga siendo legible aunque el usuario se renombre o se desactive, y para que ninguna FK impida borrar un registro padre. \code{UserId} es nullable porque un inicio de sesión fallido con un correo inexistente no tiene a quién referenciar. Sus dos enums (\code{Audit}\allowbreak \code{Categoria}, \code{AuditAccion}) son los únicos del modelo persistidos como \code{string}. Índices sobre \code{FechaHora}, \code{Categoria}, \code{Accion} y \code{UserId}, los cuatro filtros de la vista. Ver \hyperref[adr:0013]{ADR 0013} y el Capítulo~\ref{mod:16-auditoria}.
+
+\section{Tabla de enums}
+\label{sec:tabla-enums}
+
+\begin{longtable}{p{3.2cm}p{7.2cm}p{4.4cm}}
+\caption{Los 31 enums de negocio del modelo, guardados como \texttt{int} vía \texttt{HasConversion<int>()} --- salvo los dos de auditoría, guardados como \texttt{string}.}
+\label{tab:enums} \\
+\toprule
+\textbf{Enum} & \textbf{Valores} & \textbf{Usado en} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Enum} & \textbf{Valores} & \textbf{Usado en} \\
+\midrule
+\endhead
+\code{EstadoVenta} & Borrador=1, Confirmada=2, EnProceso=3 (sin uso en ventas nuevas), ListaParaCobrar=4, ComprobanteEmitido=5, Cancelada=6 & \code{Venta.Estado} \\
+\code{TipoVenta} & Directa=1, TrabajoAPedido=2 & \code{Venta.Tipo} \\
+\code{CondicionVenta} & Contado=0, Credito=1 & \code{Venta.}\allowbreak \code{CondicionVenta}, \code{FacturaCompra.}\allowbreak \code{CondicionVenta} \\
+\code{TipoLineaVenta} & Producto=0, Servicio=1, Lente=2 & \code{VentaLinea.Tipo} \\
+\code{CategoriaFiscal} & Exento=0, Gravado5=1, Gravado10=2 & \code{VentaLinea.}\allowbreak \code{CategoriaFiscal} \\
+\code{TipoCobro} & Seña=1, Cuota=2 & \code{Cobro.Tipo} \\
+\code{MetodoPago} & Efectivo=0, Tarjeta=1, Transferencia=2, Cheque=3 & \code{CobroLinea}, \code{MovimientoCaja}, \code{Egreso} \\
+\code{TipoComprobante} / \code{EstadoComprobante} & ReciboSimple=1 / Emitido=1, Anulado=2 & \code{Comprobante} \\
+\code{TipoDevolucion} / \code{EstadoDevolucion} & Devolucion=1, Cambio=2 / Pendiente=1, Confirmada=2, Rechazada=3 & \code{Devolucion} \\
+\code{Tipo}\allowbreak \code{Documento}\allowbreak \code{Fiscal} & Factura=1, NotaCredito=2 & \code{Timbrado.Tipo} (series fiscales separadas) \\
+\code{Estado}\allowbreak \code{Trabajo}\allowbreak \code{Pedido} & PendienteAprobacion=0, PendienteEnvio=1, Enviado=2, Recibido=3, Rechazado=4, Borrador=5 & \code{TrabajoPedido.}\allowbreak \code{Estado} \\
+\code{Medio}\allowbreak \code{Envio}\allowbreak \code{Laboratorio} & WhatsApp=0, Email=1, Portal=2, Telefono=3, EnPersona=4, Otro=5 & \code{TrabajoPedido.}\allowbreak \code{MedioEnvio} \\
+\code{EstadoPedido} & Borrador=0, Confirmada=1, RecibidaParcial=2, RecibidaTotal=3, Cancelada=4, Facturada=5 & \code{PedidoProveedor.}\allowbreak \code{Estado} \\
+\code{TipoIvaFactura} & ver \code{TipoIvaFactura.cs} (incluye Iva10 como default) & \code{FacturaCompraItem.}\allowbreak \code{TipoIva} \\
+\code{TipoEgreso} & FacturaCompra=0, Honorario=1, GastoGeneral=2, Salario=3, FacturaLaboratorio=4 & \code{Egreso.Tipo} (discriminador TPH) \\
+\code{EstadoEgreso} & Borrador=0, Pendiente=1, Pagado=2, Anulado=3, Aprobado=4, Rechazado=5 & \code{Egreso.Estado} \\
+\code{Tipo}\allowbreak \code{Movimiento}\allowbreak \code{Caja} & Ingreso=0, Egreso=1 & \code{MovimientoCaja.}\allowbreak \code{Tipo} \\
+\code{EstadoSesionCaja} & Abierta, Cerrada, PendienteAprobacion & \code{SesionCaja.Estado} \\
+\code{TurnoEstado} & Pendiente=0, Completado=1, Cancelado=2, Confirmado=3, Presente=4 & \code{Turno.Estado} \\
+\code{Tipo}\allowbreak \code{Categoria}\allowbreak \code{Producto} & Generico=0, Armazon=1, Cristal=2 (obsoleto) & \code{CategoriaProducto.}\allowbreak \code{Tipo} \\
+\code{TipoFacturacion} & Fisica, Juridica & \code{Cliente.}\allowbreak \code{TipoFacturacion} \\
+\code{Tipo}\allowbreak \code{Movimiento}\allowbreak \code{Stock} & Entrada=0, Salida=1, Ajuste=2 & \code{MovimientoStock.}\allowbreak \code{Tipo} \\
+\code{Estado}\allowbreak \code{Movimiento}\allowbreak \code{Stock} & Pendiente=0, Aprobado=1, Rechazado=2 & \code{MovimientoStock.}\allowbreak \code{Estado} \\
+\code{Estado}\allowbreak \code{Conteo}\allowbreak \code{Inventario} & Pendiente=0, Aprobado=1, Rechazado=2 & \code{ConteoInventario.}\allowbreak \code{Estado} \\
+\code{Estado}\allowbreak \code{Transferencia}\allowbreak \code{Stock} & Pendiente=0, Aceptada=1, Rechazada=2 & \code{TransferenciaStock.}\allowbreak \code{Estado} \\
+\code{Tipo}\allowbreak \code{Motivo}\allowbreak \code{Movimiento} & Entrada=0, Salida=1, Ambos=2 & \code{MotivoMovimiento.}\allowbreak \code{Tipo} \\
+\code{Tipo}\allowbreak \code{Notificacion} & BajoStock=0, TransferenciaPendiente=1, PedidoLabRecibido=2 & \code{Notificacion}\allowbreak \code{Interna.}\allowbreak \code{Tipo} \\
+\code{Audit}\allowbreak \code{Categoria} & Seguridad, Admin, Operativo \emph{(como \texttt{string})} & \code{Registro}\allowbreak \code{Auditoria.}\allowbreak \code{Categoria} \\
+\code{AuditAccion} & 15 acciones auditadas \emph{(como \texttt{string})} --- ver Capítulo~\ref{mod:16-auditoria} & \code{Registro}\allowbreak \code{Auditoria.}\allowbreak \code{Accion} \\
+\bottomrule
+\end{longtable}
+
+\section{Índices, constraints y convenciones de tipos}
+\label{sec:indices-constraints}
+
+Las convenciones de mapeo las fija \code{Persistence/}\allowbreak \code{Configurations/}\allowbreak \code{*.}\allowbreak \code{cs}:
+
+\begin{itemize}
+  \item \textbf{27 índices únicos} (\code{HasIndex(.}\allowbreak \code{.}\allowbreak \code{.}\allowbreak \code{).}\allowbreak \code{IsUnique()}) en todo el modelo. Los más relevantes: \code{persons.CI}, \code{persons.Email} (con \code{Are}\allowbreak \code{Nulls}\allowbreak \code{Distinct(true)} --- permite múltiples \code{NULL}), \code{professionals.}\allowbreak \code{LicenseNumber} y \code{professionals.}\allowbreak \code{UserId}, \code{users.PersonId} y \code{patients.PersonId}, \code{timbrados} compuesto (\code{NumeroTimbrado}, \code{Establecimiento}, \code{PuntoExpedicion}), \code{turnos} (\code{ProfessionalId}, \code{FechaHora}), \code{horarios_}\allowbreak \code{profesional} (\code{ProfessionalId}, \code{SucursalId}, \code{DiaSemana}), \code{bloqueos_fecha} (\code{ProfessionalId}, \code{Fecha}), \code{sucursales.Codigo}, \code{permissions} (\code{Entidad}, \code{Nombre}).
+  \item \textbf{FKs con \code{OnDelete} explícito:} 63 \code{Restrict} (default defensivo, no deja borrar un padre con hijos), 19 \code{Cascade} (reservado para hijos de composición: líneas de venta, de pedido, etc.) y 13 \code{SetNull} (el hijo sobrevive sin el padre). EF autoindexa cada FK.
+\end{itemize}
+
+Dinero se mapea siempre a \code{numeric}, nunca a \code{float}/\code{double}, y con una escala uniforme: \code{numeric(18,0)} en las 24 columnas monetarias del modelo. El Guaraní no tiene centavos, así que ninguna de ellas admite decimales, y el frontend trata el dinero como entero en consecuencia. Queda una sola excepción: \code{Tratamiento.}\allowbreak \code{Precio}, que sigue en \code{numeric(14,2)}. Los porcentajes, que sí necesitan decimales, van en \code{numeric(5,2)}.
+
+\begin{itemize}
+  \item \textbf{Fechas/horas:} \code{DateTime} mapea a \code{timestamp with time zone} (UTC) en todo el modelo; fechas puras (\code{BirthDate}, campos \code{Fecha}) mapean a \code{date}; horas de disponibilidad a \code{time}.
+  \item \textbf{Auditoría} (\code{CreatedAt}/\code{UpdatedAt}) se setea en la aplicación (\code{DateTime.UtcNow} en la entidad), no hay \code{DEFAULT now()} ni trigger en la base --- un \code{INSERT}/\code{UPDATE} por SQL crudo deja esas columnas sin valor.
+  \item \textbf{Soft delete} (\code{IsActive}) es manual, sin query filter global --- cada servicio decide si filtra por \code{IsActive}; no asumir que una consulta ya excluye inactivos.
+  \item \textbf{Enums de negocio} se guardan como \code{int} (32 llamadas a \code{Has}\allowbreak \code{Conversion<int>()} repartidas en 22 archivos de configuración), con una sola excepción deliberada: los dos enums de \code{Registro}\allowbreak \code{Auditoria} van como \code{string} (\code{Has}\allowbreak \code{Conversion<string>()}), para que agregar una acción auditable nueva no requiera migración. No hay \code{CHECK} en la base que valide el rango --- un valor fuera de rango entra sin error por SQL crudo. Tampoco hay \code{CHECK} para montos $\geq 0$ ni stock no negativo.
+\end{itemize}
+
+\section{Patrones de diseño transversales}
+\label{sec:patrones-transversales}
+
+\begin{itemize}
+  \item \textbf{Herencia TPH} (\code{Egreso} y sus 5 subtipos) --- única jerarquía de herencia real del modelo; todo lo demás es composición/FK plana.
+  \item \textbf{Vistas SQL como entidad de solo lectura} (\code{StockActualView} $\to$ \code{vw_stock_actual}, \code{HasNoKey()}) --- patrón a reutilizar si aparecen más cálculos agregados que no deben vivir como columna física.
+  \item \textbf{Estados siempre como enum} --- todo campo de estado o de tipo del modelo es un enum C\# persistido como \code{int} vía \code{Has}\allowbreak \code{Conversion<int>()}, tanto en los módulos comerciales (\code{Venta}, \code{TrabajoPedido}, \code{PedidoProveedor}, \code{Egreso}) como en inventario (\code{MovimientoStock}, \code{ConteoInventario}, \code{Transferencia}\allowbreak \code{Stock}, \code{MotivoMovimiento}) y notificaciones (\code{Notificacion}\allowbreak \code{Interna}). El conjunto de valores válidos queda definido en un solo lugar --- el tipo --- en vez de depender de que cada servicio escriba la cadena correcta.
+  \item \textbf{Precio siempre derivado, nunca manual} --- \code{Producto.}\allowbreak \code{PrecioVenta} (por margen de categoría). Ver \hyperref[adr:0004]{ADR 0004}.
+  \item \textbf{Scoping por sucursal} --- la mayoría de entidades transaccionales de los Grupos B y C tienen \code{SucursalId} (nullable solo donde la entidad es intencionalmente global). Ver el capítulo de Arquitectura del Backend, § Multi-sucursal.
+  \item \textbf{Person como raíz de identidad} --- todo rol funcional (\code{User}, \code{Patient}, \code{Cliente}) cuelga de \code{Person}, nunca al revés.
+\end{itemize}

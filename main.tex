@@ -1,0 +1,76 @@
+% ============================================================
+% SIGA — Documentación Técnica — Documento principal
+% ============================================================
+% Para compilar solo un capítulo mientras se corrige algo, se
+% puede descomentar \includeonly{...} más abajo con la lista de
+% archivos deseados (sin extensión, con la ruta relativa).
+% ============================================================
+
+\input{preamble}
+
+% \includeonly{capitulos/02-modelo-de-datos}
+
+\begin{document}
+
+\input{portada}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+
+% ── Capítulo 1 — Introducción ────────────────────────────────────────────
+\include{capitulos/introduccion}
+
+% ── Capítulo 2 — Resumen del Proyecto ─────────────────────────────────────
+\include{capitulos/resumen-proyecto}
+
+% ── Capítulo 3 — Arquitectura de la Solución ──────────────────────────────
+\part{Arquitectura de la Solución}
+\include{capitulos/01-arquitectura}
+\include{capitulos/03-arquitectura-frontend}
+
+% ── Capítulo 4 — Construcción del Software (uno por módulo) ──────────────
+\part{Construcción del Software}
+\include{capitulos/04-01-identidad-y-acceso}
+\include{capitulos/04-02-pacientes-y-profesionales}
+\include{capitulos/04-03-personal}
+\include{capitulos/04-04-agenda-turnos}
+\include{capitulos/04-05-clinica}
+\include{capitulos/04-06-clientes}
+\include{capitulos/04-07-inventario-catalogo}
+\include{capitulos/04-08-ventas}
+\include{capitulos/04-09-laboratorio}
+\include{capitulos/04-10-compras}
+\include{capitulos/04-11-caja-y-egresos}
+\include{capitulos/04-12-roles-y-permisos}
+\include{capitulos/04-13-notificaciones}
+\include{capitulos/04-14-reportes}
+\include{capitulos/04-15-sucursales}
+\include{capitulos/04-16-auditoria}
+
+% ── Capítulo 5 — Base de Datos ────────────────────────────────────────────
+\include{capitulos/02-modelo-de-datos}
+
+% ── Capítulo 6 — Implementación ───────────────────────────────────────────
+\include{capitulos/implementacion}
+
+% ── Capítulo 7 — Validación ───────────────────────────────────────────────
+\include{capitulos/validacion}
+
+% ── Capítulo 8 — Cambios respecto al Proyecto I ───────────────────────────
+\include{capitulos/cambios-proyecto1}
+
+% ── Capítulo 9 — Conclusiones ─────────────────────────────────────────────
+\include{capitulos/conclusiones}
+
+% ── Bibliografía ───────────────────────────────────────────────────────────
+\printbibliography[title={Bibliografía}]
+
+\appendix
+\include{apendices/a-referencia-api}
+\include{apendices/b-decisiones-diseno}
+\include{apendices/c-manual-usuario}
+\include{apendices/d-manual-tecnico}
+
+\end{document}

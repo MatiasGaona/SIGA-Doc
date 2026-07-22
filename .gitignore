@@ -1,0 +1,37 @@
+# ── Artefactos de compilación de LaTeX ───────────────────────────────────
+# Se regeneran en cada compilación (local o en Overleaf); no van al historial.
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv
+
+# Beamer
+*.nav
+*.snm
+*.vrb
+
+# ── Sistema operativo / editores ─────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# ── Nota ─────────────────────────────────────────────────────────────────
+# Los PDF compilados (auxiliares/SIGA_Documentación_Técnica.pdf y
+# presentacion/presentacion.pdf) SÍ se versionan a propósito: son los
+# entregables, y conviene tener el archivo exacto que se presentó en cada
+# instancia, no solo las fuentes que lo generan.

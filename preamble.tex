@@ -1,0 +1,244 @@
+% ============================================================
+% SIGA — Documentación Técnica — Preámbulo compartido
+% ============================================================
+% Motor de compilación: pdflatex (Overleaf: Menu > Compiler > pdfLaTeX).
+% REGLA para todo capítulo/apéndice: usar SOLO lo que ya está
+% definido acá (paquetes, colores, estilos TikZ, comandos, entornos).
+% No agregar \usepackage nuevos dentro de un capítulo — si hace
+% falta algo que no está, se agrega ACÁ para que todos lo compartan.
+% ============================================================
+
+\documentclass[11pt,a4paper,oneside]{report}
+
+% ---------- Idioma y codificación ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% ---------- Ajuste fino de líneas ----------
+% Comprime/expande el espaciado de caracteres unos puntos porcentuales para
+% que más líneas encajen sin overfull \hbox, sin tocar ningún contenido.
+% Reduce la mayoría de los "Overfull hbox" del documento (identificadores de
+% código largos en \code{} contra el margen); no elimina los casos extremos,
+% para esos hace falta un \allowbreak manual en el punto/guión bajo.
+\usepackage{microtype}
+% Ultimo recurso de TeX para armar un renglon: cuando ni microtype ni los
+% \allowbreak alcanzan (parrafos con identificadores de codigo largos), permite
+% estirar el espaciado de esa linea puntual en vez de dejar que el texto se
+% salga del margen. Solo actua en los renglones que de otro modo darian
+% Overfull \hbox; el resto del documento no cambia.
+\setlength{\emergencystretch}{3em}
+
+\usepackage[spanish]{babel}
+% El módulo spanish activa < y > como shorthand de <<...>> (comillas
+% angulares). Esto rompe cualquier texto con genéricos de C# (Result<T>,
+% List<T>, HasConversion<int>()) dentro de argumentos móviles (TikZ,
+% \section, \caption) con errores "extra }" / "runaway argument". Este
+% documento no usa comillas angulares en ningún lado, así que se
+% desactiva por completo en vez de escapar cada ocurrencia a mano.
+% IMPORTANTE: babel solo activa los shorthands del idioma principal recién
+% en \begin{document} (vía \selectlanguage interno) — un \shorthandoff{<>}
+% suelto acá, en el preámbulo, se ejecuta ANTES de esa activación y queda
+% pisado. Por eso se difiere con \AtBeginDocument, para que corra después.
+\AtBeginDocument{\shorthandoff{<>}}
+\usepackage{csquotes}
+
+% ---------- Página ----------
+\usepackage[margin=2.5cm,headheight=14pt]{geometry}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyhead[R]{\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+% ---------- Títulos de capítulo ----------
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{16pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{32pt}
+
+% ---------- Colores (paleta institucional de SIGA-Web, ver design-system.md) ----------
+\usepackage{xcolor}
+\definecolor{sigaAzul}{HTML}{00288E}
+\definecolor{sigaCyan}{HTML}{006780}
+\definecolor{sigaVerde}{HTML}{1B7A3D}
+\definecolor{sigaAmbar}{HTML}{9A6700}
+\definecolor{sigaRojo}{HTML}{B3261E}
+\definecolor{sigaGris}{HTML}{5F6368}
+
+% ---------- Bibliografía ----------
+\usepackage[backend=biber,style=apa]{biblatex}
+\addbibresource{bibliografia.bib}
+
+% ---------- Enlaces internos/externos ----------
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=sigaAzul,
+  citecolor=sigaVerde,
+  urlcolor=sigaCyan,
+  pdftitle={SIGA-Optica -- Sistema Integral de Gestion y Agendamiento para Opticas},
+  pdfauthor={Matias Melgarejo, Matias Gaona},
+  bookmarksnumbered=true,
+  bookmarksopen=true,
+}
+
+% ---------- Tablas ----------
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.2}
+
+% ---------- Listados de código ----------
+\usepackage{listings}
+\lstdefinestyle{sigaCode}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{sigaAzul}\bfseries,
+  commentstyle=\color{sigaGris}\itshape,
+  stringstyle=\color{sigaVerde},
+  numbers=left,
+  numberstyle=\tiny\color{sigaGris},
+  numbersep=8pt,
+  frame=single,
+  framesep=4pt,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=2,
+  backgroundcolor=\color{black!3},
+  captionpos=b,
+  literate=
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {ü}{{\"u}}1 {Ü}{{\"U}}1
+    {¿}{{?`}}1 {¡}{{!`}}1,
+}
+\lstset{style=sigaCode}
+% Nota: literate cubre tildes/ñ dentro de lstlisting/\lstinline. Los
+% caracteres de dibujo de caja Unicode (├ └ │ ─) NO están cubiertos y
+% NO hay que usarlos — para árboles de carpetas usar ASCII (|--, `--).
+
+% ---------- Diagramas (TikZ) ----------
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.multipart,calc,fit,backgrounds,decorations.pathreplacing}
+
+% --- Estilo compartido: diagramas de ARQUITECTURA / COMPONENTES ---
+\tikzset{
+  capa/.style={rectangle, rounded corners, draw=sigaAzul, thick,
+    fill=sigaAzul!8, minimum width=3.2cm, minimum height=1.1cm,
+    align=center, font=\small},
+  subcapa/.style={rectangle, rounded corners, draw=sigaAzul!70, thin,
+    fill=white, minimum width=2.6cm, minimum height=0.8cm,
+    align=center, font=\scriptsize},
+  externo/.style={rectangle, draw=sigaGris, thick, fill=sigaGris!10,
+    minimum width=2.6cm, minimum height=1cm, align=center, font=\small},
+  flechaArq/.style={-{Latex[length=2.5mm]}, thick, sigaGris},
+}
+
+% --- Estilo compartido: diagramas ER (entidad-relación) ---
+% Uso: \node[entidad] (id) {\textbf{\textcolor{sigaAzul}{Nombre}} \nodepart{two} campo1 \\ campo2 \\ ...};
+\tikzset{
+  entidad/.style={
+    rectangle split, rectangle split parts=2, draw=sigaAzul, thick,
+    rectangle split part align={center,left}, rounded corners=1pt,
+    fill=white, font=\footnotesize, text width=3.6cm, align=left,
+    inner sep=4pt,
+  },
+  relacion/.style={-, thick, sigaGris},
+  relacionN/.style={-{Bar[]}, thick, sigaGris},
+}
+% Título en negrita del compartimento superior de una entidad:
+% primer renglón del nodo -> usar \textbf{\textcolor{sigaAzul}{Nombre}}
+
+% --- Estilo compartido: diagramas de SECUENCIA ---
+\tikzset{
+  actor/.style={rectangle, draw=sigaAzul, thick, fill=sigaAzul!8,
+    minimum width=2.6cm, minimum height=0.8cm, align=center,
+    font=\small\bfseries},
+  lineavida/.style={dashed, sigaGris},
+  mensaje/.style={-{Latex[length=2mm]}, thick},
+  mensajeretorno/.style={-{Latex[length=2mm]}, thick, dashed},
+}
+
+% ---------- Cajas de estado / advertencia / ADR ----------
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+% Uso cajaAdvertencia/cajaRiesgo (el título es OPCIONAL, va con []):
+%   \begin{cajaAdvertencia}  texto...  \end{cajaAdvertencia}                (título default "Atención"/"Riesgo")
+%   \begin{cajaAdvertencia}[Título custom]  texto...  \end{cajaAdvertencia}
+\newtcolorbox{cajaAdvertencia}[1][Atención]{
+  colback=sigaAmbar!8, colframe=sigaAmbar, boxrule=0.8pt, arc=2pt,
+  breakable, fonttitle=\bfseries\color{white}, colbacktitle=sigaAmbar,
+  title=#1,
+}
+\newtcolorbox{cajaRiesgo}[1][Riesgo]{
+  colback=sigaRojo!6, colframe=sigaRojo, boxrule=0.8pt, arc=2pt,
+  breakable, fonttitle=\bfseries\color{white}, colbacktitle=sigaRojo,
+  title=#1,
+}
+% Uso cajaADR (el título es OBLIGATORIO, va con {}):
+%   \begin{cajaADR}{ADR 0007 -- El cristal ya no es Producto con stock}  texto...  \end{cajaADR}
+\newtcolorbox{cajaADR}[1]{
+  colback=sigaAzul!4, colframe=sigaAzul, boxrule=0.8pt, arc=2pt,
+  breakable, fonttitle=\bfseries\color{white}, colbacktitle=sigaAzul,
+  title=#1,
+}
+
+% ---------- Marcadores de estado (reemplazan ✅/⚠️/🟡 de Markdown) ----------
+\newcommand{\Implementado}{\textcolor{sigaVerde}{\textbf{[Implementado]}}}
+\newcommand{\Planificado}{\textcolor{sigaGris}{\textbf{[Planificado]}}}
+\newcommand{\Atencion}{\textcolor{sigaAmbar}{\textbf{[Atención]}}}
+\newcommand{\RiesgoTag}{\textcolor{sigaRojo}{\textbf{[Riesgo]}}}
+
+% ---------- Código inline (reemplazo de `backtick` de Markdown) ----------
+% Uso: \code{ver_pacientes}  ->  escapa _ % & # automáticamente, no hace
+% falta escapar nada a mano adentro de \code{...}.
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+
+% ---------- Tabla de endpoints del Apéndice de Referencia de API ----------
+% Evita repetir el boilerplate de longtable una vez por controller.
+% Uso: \begin{apiTable}{\texttt{AuthController}}{tab:api-auth} ... \end{apiTable}
+% OJO: #1 termina en un \caption{} (argumento móvil) -> usar \texttt{}, nunca \code{}.
+\newenvironment{apiTable}[2]{%
+  \setlength{\tabcolsep}{2pt}%
+  \begin{longtable}{@{}p{1.3cm}p{5.0cm}p{3.2cm}p{2.9cm}p{2.9cm}@{}}
+  \caption{#1}\label{#2}\\
+  \toprule
+  \textbf{Método} & \textbf{Ruta} & \textbf{Policy} & \textbf{Request} & \textbf{Response} \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \textbf{Método} & \textbf{Ruta} & \textbf{Policy} & \textbf{Request} & \textbf{Response} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+}{%
+  \end{longtable}
+}
+
+% ---------- Listas ----------
+\usepackage{enumitem}
+\setlist{itemsep=2pt, topsep=4pt}
+
+% ---------- Figuras / captions ----------
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\captionsetup{font=small, labelfont=bf, margin=1cm}
+
+\linespread{1.08}
+
+% ---------- Convención de \label (documentado, no forzado por código) ----------
+% sec:<capitulo>-<seccion>   ej. sec:arch-multisucursal
+% fig:<tipo>-<slug>          ej. fig:er-identidad, fig:seq-venta-a-pedido
+% tab:<slug>                 ej. tab:api-auth, tab:enums
+% mod:<numero>-<slug>        ej. mod:08-ventas
+% adr:<numero>               ej. adr:0007

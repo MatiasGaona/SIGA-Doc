@@ -1,0 +1,52 @@
+\chapter{Resumen del Proyecto}
+\label{sec:resumen-proyecto}
+
+\section{Problema}
+\label{sec:resumen-problema}
+
+El Centro Óptico Santa María administraba el agendamiento de citas, la historia clínica de sus pacientes, el control de inventario de productos ópticos y el seguimiento de ventas mediante procesos manuales y herramientas desconectadas entre sí. Esa fragmentación dificultaba tener información confiable y actualizada para la atención al paciente y para la toma de decisiones administrativas, y exponía a la óptica a errores de registro, duplicidad de datos y demoras evitables.
+
+\section{Solución propuesta}
+\label{sec:resumen-solucion}
+
+SIGA-Óptica es un sistema web integral que centraliza la gestión administrativa, clínica y comercial de la óptica en una única plataforma. La solución se estructura como una API REST (ASP.NET Core~\cite{msaspnetcore} / .NET 10, Entity Framework Core~\cite{msefcore}, PostgreSQL~\cite{postgresql}) consumida por una aplicación web (Vue~3~\cite{vuejs} / TypeScript~\cite{typescript}), con control de acceso basado en permisos individuales y soporte para operar simultáneamente en más de una sucursal física. El Capítulo~\ref{sec:arch} describe la arquitectura adoptada en detalle.
+
+Sobre esa base se construyeron los módulos de negocio necesarios para cubrir el ciclo completo de la óptica: desde el registro de un paciente y el agendamiento de su cita, pasando por la consulta clínica y la receta que de ella resulta, hasta la venta de productos ópticos --- de mostrador o ``a pedido'', con armazón y cristal a medida fabricados por un laboratorio externo ---, su cobro, la emisión del comprobante fiscal correspondiente y el control del stock e inventario que esa venta consume.
+
+\section{Alcance definitivo}
+\label{sec:resumen-alcance}
+
+El sistema entregado comprende dieciséis módulos de negocio:
+
+\begin{longtable}{p{4.2cm}p{9.4cm}}
+\caption{Módulos entregados en SIGA-Óptica.}
+\label{tab:resumen-modulos}\\
+\toprule
+\textbf{Módulo} & \textbf{Cubre} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Módulo} & \textbf{Cubre} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Identidad y Acceso (Cap.~\ref{mod:01-identidad-y-acceso}) & Autenticación JWT, registro, verificación de email, recuperación de contraseña, control de acceso por permisos \\
+Pacientes y Profesionales (Cap.~\ref{mod:02-pacientes-y-profesionales}) & Alta y gestión de pacientes y de profesionales de la salud \\
+Personal (Cap.~\ref{mod:03-personal}) & Alta y gestión de empleados administrativos \\
+Agenda de Turnos (Cap.~\ref{mod:04-agenda-turnos}) & Reserva de citas por el staff y autogestionada por el paciente, disponibilidad del profesional, confirmación y cancelación \\
+Historia Clínica (Cap.~\ref{mod:05-clinica}) & Registro de consultas, diagnósticos y recetas ópticas \\
+Clientes (Cap.~\ref{mod:06-clientes}) & Quién compra --- puede o no ser también un paciente \\
+Inventario y Catálogo (Cap.~\ref{mod:07-inventario-catalogo}) & Productos, stock por lote y sucursal, movimientos y conteos \\
+Ventas (Cap.~\ref{mod:08-ventas}) & Venta directa y venta ``a pedido'', presupuestos, cobro y comprobante fiscal \\
+Laboratorio (Cap.~\ref{mod:09-laboratorio}) & Ciclo del pedido óptico con el laboratorio externo \\
+Compras (Cap.~\ref{mod:10-compras}) & Pedidos a proveedores, recepción de mercadería, devoluciones \\
+Caja y Egresos (Cap.~\ref{mod:11-caja-y-egresos}) & Sesiones de caja, movimientos y egresos de dinero \\
+Roles y Permisos (Cap.~\ref{mod:12-roles-y-permisos}) & Administración de roles y permisos individuales \\
+Notificaciones (Cap.~\ref{mod:13-notificaciones}) & Centro de notificaciones internas y preferencias por usuario \\
+Reportes (Cap.~\ref{mod:14-reportes}) & Reportes gerenciales y operativos exportables \\
+Sucursales (Cap.~\ref{mod:15-sucursales}) & Aislamiento y operación multi-sucursal transversal a todo el sistema \\
+Auditoría (Cap.~\ref{mod:16-auditoria}) & Bitácora consultable de las operaciones sensibles del sistema \\
+\end{longtable}
+
+Este alcance definitivo difiere en algunos puntos del planteado originalmente en el anteproyecto; esas diferencias, con su justificación, se documentan en el Capítulo~\ref{sec:cambios-proyecto1}.

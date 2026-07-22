@@ -1,0 +1,225 @@
+\chapter{Decisiones de Diseño}
+\label{sec:adr}
+
+Un ADR (\emph{Architecture Decision Record}) documenta una decisión de diseño no trivial: el contexto que la motivó, qué se decidió, y qué se gana y qué se pierde con esa elección. Las 13 decisiones de este apéndice no son nuevas --- formalizan patrones que ya estaban implícitos en el diseño de SIGA, dejándolos explícitos para quien mantenga o extienda el sistema.
+
+\section{ADR 0001 --- Person como raíz única de identidad; Cliente cuelga de Person}
+\label{adr:0001}
+
+\begin{cajaADR}{ADR 0001 --- Person como raíz única de identidad}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} El sistema necesita modelar distintos roles funcionales de una misma persona física (paciente, profesional, cliente, empleado, usuario administrativo) sin duplicar sus datos personales ni forzar relaciones directas entre esos roles entre sí.
+
+\textbf{Decisión.} \code{Person} es la entidad raíz única (CI, nombre, contacto). Cada rol funcional (\code{User}, \code{Patient}, \code{Professional}, \code{Cliente}, \code{Empleado}) cuelga de \code{Person} (o de \code{User}) vía FK propio, nunca al revés. En particular, \code{Cliente} no es una entidad de facturación separada de \code{Patient}: ambos referencian el mismo \code{Person} cuando corresponden a la misma persona física, sin FK directa entre \code{Cliente} y \code{Patient} --- se relacionan solo vía \code{PersonId} compartido. Los datos de facturación (\code{TipoFacturacion}, \code{RazonSocial}, \code{RucCiFiscal}, \code{Direccion}, etc.) viven directamente en \code{Cliente}. Esto reemplazó un diseño anterior con una entidad \code{DatosFacturacion} colgando de \code{Patient}, migrada y eliminada (migración \code{035_Clientes}).
+
+\textbf{Consecuencias.} \textbf{Gana:} un paciente puede convertirse en cliente (o viceversa) sin duplicar sus datos personales ni migrar identidad; consultas cross-rol (``¿este cliente también es paciente?'') se resuelven por \code{PersonId} compartido, sin joins forzados entre tablas de rol.
+
+\textbf{Pierde:} cualquier query que necesite ``todas las facetas de una persona'' tiene que hacer join manual vía \code{PersonId} en vez de tener una sola tabla; no hay integridad referencial que fuerce que un \code{Cliente} y un \code{Patient} con el mismo \code{Person} sean intencionalmente la misma persona (un alta descuidada podría crear un \code{Person} duplicado con datos ligeramente distintos para la misma persona real).
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo A (\code{Person}, \code{Cliente}, \code{Patient}); \hyperref[mod:06-clientes]{módulo de Clientes}.
+
+\section{ADR 0002 --- Stock derivado de movimientos aprobados, no un campo mutable}
+\label{adr:0002}
+
+\begin{cajaADR}{ADR 0002 --- Stock derivado de movimientos}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} El modelo original tenía \code{StockActual}/\code{StockMinimo}/\code{StockMaximo} como campos directos de \code{Producto}, lo que hacía imposible auditar de dónde salió cada cambio de stock ni soportar múltiples sucursales sin ambigüedad sobre a qué sucursal pertenecía ese número.
+
+\textbf{Decisión.} \code{Producto} ya no tiene campos de stock. El stock se deriva sumando \code{MovimientoStock} (\code{Entrada} +, \code{Salida} $-$) filtrados por \code{Estado = "Aprobado"}, expuesto vía la vista SQL \code{vw_stock_actual} (mapeada como entidad de solo lectura \code{StockActualView}, \code{HasNoKey()}), agrupada por producto más sucursal. Todo servicio que antes tocaba el stock directamente ahora crea un \code{MovimientoStock} en su lugar. Mín/máx de stock quedaron en una tabla separada 1:1 (\code{Producto}\allowbreak \code{Stock}\allowbreak \code{Config}), hoy global (no por sucursal) por decisión explícita para no romper la relación 1:1 durante la migración multi-sucursal.
+
+\textbf{Consecuencias.} \textbf{Gana:} trazabilidad completa de cada cambio de stock (quién, cuándo, por qué motivo vía \code{MotivoMovimiento}); soporte natural para stock por sucursal sin duplicar \code{Producto}; movimientos pueden pasar por un estado \code{Pendiente}/\code{Rechazado} sin afectar el stock real hasta ser \code{Aprobado}.
+
+\textbf{Pierde:} leer el stock actual siempre requiere una agregación (vista SQL) en vez de un simple \code{SELECT} de un campo; hay que mantener disciplina de que absolutamente ningún write-path modifique stock sin pasar por \code{MovimientoStock} --- una excepción rompería la trazabilidad silenciosamente.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo B (\code{MovimientoStock}, \code{StockActualView}, \code{Producto}\allowbreak \code{Stock}\allowbreak \code{Config}); \hyperref[mod:07-inventario-catalogo]{módulo de Inventario y Catálogo}.
+
+\section{ADR 0003 --- Autorización basada en permisos individuales, no en roles con nombre fijo}
+\label{adr:0003}
+
+\begin{cajaADR}{ADR 0003 --- Autorización por permisos}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} Un sistema de roles fijos (ej. ``Admin'', ``Recepcionista'' codificados en el backend) acopla la lógica de autorización al nombre del rol, dificultando que el negocio cree roles ad-hoc (ej. ``Recepcionista Senior'' con un permiso extra) sin modificar código ni hacer un despliegue.
+
+\textbf{Decisión.} La autorización real de cada endpoint se basa en permisos individuales (\code{Permission}), no en el nombre ni el tipo del \code{Role}. Un \code{Role} es solo una colección con nombre de permisos (\code{RolePermission}, many-to-many); el JWT emite un claim \code{"permission"} por cada permiso resuelto, no el nombre del rol. \code{Program.cs} define una policy por permiso (\code{RequireClaim("permission", perm)}), más dos policies compuestas con \code{RequireAssertion} para OR de permisos. \code{Role.Type} (\code{admin}/\code{professional}/\code{patient}, nullable e inmutable) es la única noción de ``rol de sistema'', usada solo para lógica interna que necesita distinguir un rol inmutable (ej. bootstrap del admin), nunca para autorizar endpoints.
+
+\textbf{Consecuencias.} \textbf{Gana:} el negocio puede crear/editar roles y su combinación de permisos desde \code{/roles} sin ningún cambio de código ni despliegue; los permisos son la única fuente de verdad para ``qué puede hacer este usuario'', sin casos especiales por nombre de rol.
+
+\textbf{Pierde:} el JWT puede volverse más pesado con muchos claims de permiso si un rol tiene muchos permisos asignados; el código nunca puede asumir ``si es rol X entonces puede hacer Y'' --- tiene que verificar el permiso explícito incluso para casos que parecen obvios por el rol, lo que exige disciplina consistente en cada nuevo endpoint.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:arch-autorizacion]{Arquitectura} --- \S\ref{sec:arch-autorizacion}; Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo A (\code{Role}, \code{Permission}, \code{RolePermission}); \hyperref[mod:01-identidad-y-acceso]{módulo de Identidad y Acceso}.
+
+\section{ADR 0004 --- Precio de venta siempre derivado del margen de categoría}
+\label{adr:0004}
+
+\begin{cajaADR}{ADR 0004 --- Precio de venta derivado por margen}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} El formulario de producto no exponía el precio de venta y el campo quedaba en 0, forzando a tipear el precio a mano en cada línea de venta --- inconsistente entre vendedores y propenso a error.
+
+\textbf{Decisión.} \code{Producto.}\allowbreak \code{PrecioVenta} se calcula siempre como \code{round(PrecioCosto * (1 + CategoriaProducto.Margen/100))}, centralizado en el método de dominio \code{Producto.AplicarCosto(costo, margen)}. Se llama desde todo write-path que toca el costo: alta/edición de producto, recepción de mercadería, y actualización del margen de una categoría (que recalcula todos los productos de esa categoría). El campo \code{PrecioVenta} de los DTOs de request quedó sin uso --- el backend es la única fuente de verdad. En la venta, el precio autocompleta desde \code{producto.}\allowbreak \code{PrecioVenta} pero queda editable por línea para un ajuste puntual.
+
+\textbf{Consecuencias.} \textbf{Gana:} consistencia de márgenes garantizada por diseño; un solo lugar (el margen de la categoría) para ajustar la rentabilidad de toda una línea de productos a la vez.
+
+\textbf{Pierde:} no hay forma de fijar un precio de venta ``manual'' de catálogo sin editar el margen de la categoría o el costo del producto --- decisión explícita, no un descuido, pero limita casos de pricing por producto individual fuera del margen estándar salvo el ajuste manual por línea de venta.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo B (\code{Producto}, \code{CategoriaProducto}); \hyperref[mod:07-inventario-catalogo]{módulo de Inventario y Catálogo}.
+
+\section{ADR 0005 --- TrabajoPedido nace en Borrador junto al presupuesto}
+\label{adr:0005}
+
+\begin{cajaADR}{ADR 0005 --- TrabajoPedido nace en Borrador}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} El flujo de venta ``a pedido'' (armazón + cristal + tratamientos + laboratorio) necesita capturarse desde el momento del presupuesto, antes de que el cliente confirme la compra --- pero no debía aparecer en la cola de trabajo del laboratorio hasta que la venta esté efectivamente confirmada.
+
+\textbf{Decisión.} \code{EstadoTrabajoPedido.}\allowbreak \code{Borrador} (agregado con valor 5, sin renumerar los estados existentes) es el estado inicial de todo \code{TrabajoPedido} creado junto a un presupuesto, en el mismo paso que \code{CrearVentaAsync}. \code{Get}\allowbreak \code{Trabajos}\allowbreak \code{Pedido}\allowbreak \code{Async} excluye explícitamente \code{Borrador} de la cola visible del laboratorio. Al confirmar la venta (\code{Confirmar}\allowbreak \code{Venta}\allowbreak \code{Async}), si el TP sigue en \code{Borrador} se exige asignar un laboratorio y pasa a \code{Pendiente}\allowbreak \code{Aprobacion}, recién ahí entrando al ciclo real de laboratorio.
+
+\textbf{Consecuencias.} \textbf{Gana:} el vendedor puede armar la configuración óptica completa (diseño de lente, tratamientos, armazón, laboratorio tentativo) desde el presupuesto sin comprometer al laboratorio ni generar ruido en su cola de trabajo real; el presupuesto sigue siendo libremente editable mientras está en \code{Borrador}.
+
+\textbf{Pierde:} cualquier query o reporte sobre \code{TrabajoPedido} tiene que recordar excluir \code{Borrador} explícitamente si no quiere contar presupuestos no confirmados como trabajo real de laboratorio --- un filtro fácil de olvidar en código nuevo.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo C (\code{TrabajoPedido}, \code{Estado}\allowbreak \code{Trabajo}\allowbreak \code{Pedido}); \hyperref[mod:08-ventas]{módulo de Ventas}; \hyperref[mod:09-laboratorio]{módulo de Laboratorio}.
+
+\section{ADR 0006 --- Cobro desacoplado del ciclo del laboratorio}
+\label{adr:0006}
+
+\begin{cajaADR}{ADR 0006 --- Cobro desacoplado del laboratorio}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} Originalmente una venta ``a pedido'' quedaba en estado \code{EnProceso} hasta que el laboratorio recibía el trabajo, y solo entonces se habilitaba el cobro --- un bloqueo de negocio real, porque impedía cobrarle al cliente (seña o total) mientras el pedido seguía en tránsito con un laboratorio externo, a veces por días o semanas.
+
+\textbf{Decisión.} \code{Confirmar}\allowbreak \code{Venta}\allowbreak \code{Async} deja \textbf{toda} venta (directa o a pedido) en estado \code{ListaParaCobrar} inmediatamente al confirmar, sin esperar al laboratorio. \code{LaboratorioService.}\allowbreak \code{RegistrarRecepcionAsync} ya no cambia el estado de la venta. El ciclo del laboratorio (envío $\to$ recepción $\to$ factura) corre en paralelo al cobro, sin bloquearse mutuamente.
+
+\textbf{Consecuencias.} \textbf{Gana:} el negocio puede cobrar (seña o total) apenas se confirma la venta, sin esperar la logística externa del laboratorio.
+
+\textbf{Pierde:} \code{EstadoVenta.}\allowbreak \code{EnProceso} quedó sin uso para ventas nuevas --- el enum se mantiene por compatibilidad con datos/reportes históricos, lo que es una fuente potencial de confusión para quien lea el código o el enum sin conocer este historial.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo C (\code{Venta.Estado}); \hyperref[mod:08-ventas]{módulo de Ventas}.
+
+\section{ADR 0007 --- El cristal graduado ya no se modela como Producto con stock}
+\label{adr:0007}
+
+\begin{cajaADR}{ADR 0007 --- El cristal ya no es Producto con stock}
+\textbf{Estado.} Aceptada (implementada) --- supersede un diseño anterior.
+
+\textbf{Contexto.} El diseño original del catálogo óptico modelaba el cristal graduado como un \code{Producto} más, distinguido por \code{CategoriaProducto.Tipo = Cristal}, con \code{TrabajoPedido.}\allowbreak \code{CristalProductoId} como FK. En la práctica, un cristal a pedido no tiene stock ni SKU fijo: se fabrica según receta, diseño de lente y tratamientos elegidos por el cliente, por lo que forzarlo a la misma tabla que armazones con stock real generaba fricción de modelado (¿qué significa ``stock'' de un cristal que no existe hasta fabricarse?).
+
+\textbf{Decisión.} El cristal se especifica hoy directamente en \code{TrabajoPedido} mediante \code{TipoLente} (clasificación de diseño: monofocal/bifocal/progresivo/ocupacional) más una colección de \code{Tratamiento}s más precio, \textbf{sin FK a \code{Producto}}. \code{TrabajoPedido.}\allowbreak \code{CristalProductoId} fue removido del modelo. \code{TipoCategoriaProducto.}\allowbreak \code{Cristal} se mantiene en el enum pero está marcado \code{[Obsoleto]} explícitamente en el propio código (se conserva por compatibilidad de datos existentes, no se ofrece al dar de alta categorías nuevas). En \code{VentaLinea}, \code{TipoLineaVenta.}\allowbreak \code{Lente} identifica la línea del cristal a pedido, que no descuenta stock.
+
+\textbf{Consecuencias.} \textbf{Gana:} el cristal a pedido se modela con su semántica real (especificación de fabricación, no inventario), sin forzar un \code{Producto}/SKU ficticio por cada combinación de diseño más tratamiento.
+
+\textbf{Pierde:} cualquier dato ya cargado bajo el diseño anterior (\code{CategoriaProducto.Tipo = Cristal}) queda como dato legado, conservado por trazabilidad histórica pero sin ofrecerse en altas nuevas; el modelo arrastra esa categoría y sus productos sin que ninguno de los dos tenga ya un rol en el flujo de venta.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo B, nota ``Catálogo óptico''; \hyperref[mod:08-ventas]{módulo de Ventas}; \hyperref[mod:09-laboratorio]{módulo de Laboratorio}.
+
+\section{ADR 0008 --- Receta puede ser clínica o externa/manual}
+\label{adr:0008}
+
+\begin{cajaADR}{ADR 0008 --- Receta clínica o externa}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} No toda venta de lentes graduados se origina en una consulta clínica registrada en el sistema --- un cliente puede traer una receta emitida por otra óptica u oftalmólogo externo, y el negocio necesita poder cargarla igual para generar el trabajo a pedido.
+
+\textbf{Decisión.} \code{Receta.}\allowbreak \code{ConsultaClinicaId} es nullable (antes era obligatorio, ligado 1:1 a una \code{ConsultaClinica}). Se agregó \code{Receta.PersonId} (nullable, FK a \code{Person}) para representar una receta ``externa'' cargada manualmente sin consulta previa. Ambos campos son nullable y mutuamente informativos: si \code{ConsultaClinicaId} es null, la receta es externa. El endpoint \code{POST /api/recetas} permite el alta manual (\code{Create}\allowbreak \code{Receta}\allowbreak \code{Manual}\allowbreak \code{Request}), separado del flujo clínico normal que sigue generando la receta desde \code{Consulta}\allowbreak \code{Clinica}\allowbreak \code{Service}.
+
+\textbf{Consecuencias.} \textbf{Gana:} el flujo de venta a pedido no depende de que el paciente haya tenido una consulta en el sistema; cubre el caso real de negocio de una óptica que también vende con receta de terceros.
+
+\textbf{Pierde:} hay dos caminos distintos para crear una \code{Receta} (clínico vs. manual) que hay que mantener sincronizados en reglas de validación; una receta externa no tiene la trazabilidad de diagnóstico/observaciones clínicas que sí tiene una receta nacida de una \code{ConsultaClinica}.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo B (\code{Receta}); \hyperref[mod:05-clinica]{módulo de Clínica}; \hyperref[mod:08-ventas]{módulo de Ventas}.
+
+\section{ADR 0009 --- Una sucursal fija por usuario, sin selector}
+\label{adr:0009}
+
+\begin{cajaADR}{ADR 0009 --- Sucursal fija por usuario}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} Al volver el sistema multi-sucursal había que decidir cómo un usuario del staff determina en qué sucursal está operando en cada momento. Un selector manual en el header es flexible pero propenso a error humano (olvidarse de cambiarlo y cargar una venta en la sucursal equivocada).
+
+\textbf{Decisión.} Cada \code{User} de staff tiene una sucursal fija (\code{User.SucursalId}), asignada desde el form de Profesional o de Empleado --- no desde la pantalla de Usuarios, que solo gestiona roles y activar/desactivar. No hay selector de sucursal en el header: la sucursal del usuario logueado determina automáticamente el scoping de todo lo que crea, resuelto centralmente vía \code{ICurrent}\allowbreak \code{User}\allowbreak \code{Context}. \code{SucursalId = null} significa usuario global: el admin (ve/filtra todas las sucursales) y los pacientes (intrínsecamente globales, eligen sucursal solo al reservar un turno). Catálogos (productos, marcas, servicios, etc.) y personas (pacientes, clientes, profesionales) quedan explícitamente globales, no scopeados por sucursal.
+
+\textbf{Consecuencias.} \textbf{Gana:} elimina una clase entera de errores humanos (cargar una operación en la sucursal equivocada por olvidar cambiar un selector); el scoping se resuelve una sola vez de forma centralizada en vez de repetirse en cada pantalla o servicio.
+
+\textbf{Pierde:} un empleado que reparte su tiempo entre dos sucursales físicas no puede operar en la segunda sin que un admin le reasigne la sucursal --- no hay soporte de ``sucursal del día'' ni multi-sucursal por usuario. Un selector cross-sucursal solo para el admin en algunos listados (stock/productos) quedó identificado como extensión posible.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:arch-multisucursal]{Arquitectura} --- \S\ref{sec:arch-multisucursal}; Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- § Scoping por sucursal; \hyperref[mod:15-sucursales]{módulo de Sucursales}.
+
+\section{ADR 0010 --- Centro de notificaciones interno antes que integración externa}
+\label{adr:0010}
+
+\begin{cajaADR}{ADR 0010 --- Notificaciones internas antes que externas}
+\textbf{Estado.} Aceptada (implementada --- Fase 1 de 5 del módulo).
+
+\textbf{Contexto.} La especificación completa del módulo de notificaciones contemplaba notificaciones externas a pacientes (email/WhatsApp/SMS) y un sistema de plantillas --- alcance demasiado grande para una sola entrega. Había que elegir con qué empezar para entregar valor real cuanto antes.
+
+\textbf{Decisión.} La Fase 1 del módulo se limitó a un centro de notificaciones \textbf{interno} al staff (\code{Notificacion}\allowbreak \code{Interna}), sin ningún canal externo todavía. Scoping por destinatario individual (\code{Destinatario}\allowbreak \code{Usuario}\allowbreak \code{Id}), broadcast por sucursal (\code{Destinatario}\allowbreak \code{Sucursal}\allowbreak \code{Id}) o broadcast global (ambos null). Tres triggers reales conectados desde el día uno: bajo stock (poller \code{BackgroundService} cada 30 min, no hook inline --- porque los movimientos ``Aprobado'' se originan desde al menos 5 servicios distintos), transferencia de stock pendiente, y pedido de laboratorio recibido.
+
+\textbf{Consecuencias.} \textbf{Gana:} valor inmediato para el staff (alertas de bajo stock, transferencias, laboratorio) sin la complejidad de integrar un proveedor de email/WhatsApp todavía; el diseño de destinatario (usuario/sucursal/global) es reutilizable tal cual para las fases externas futuras.
+
+\textbf{Pierde:} \code{Leido} es un único flag compartido para notificaciones de broadcast (no por-usuario), así que un usuario puede marcar como leída una notificación que otro compañero de la misma sucursal todavía no vio --- decisión explícita aceptada, no un descuido.
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- § Entidades transversales (\code{Notificacion}\allowbreak \code{Interna}); \hyperref[mod:13-notificaciones]{módulo de Notificaciones}.
+
+\section{ADR 0011 --- Egreso como jerarquía TPH unificando las salidas de dinero}
+\label{adr:0011}
+
+\begin{cajaADR}{ADR 0011 --- Egreso como jerarquía TPH}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} El negocio tiene varios tipos de salida de dinero con semántica distinta (factura de proveedor, honorario a profesional, gasto general, salario de empleado, factura de laboratorio) pero que comparten casi todos sus campos (monto, estado, fechas, método de pago) y necesitan aparecer juntos en reportes de caja/egresos sin duplicar esa lógica común cinco veces.
+
+\textbf{Decisión.} \code{Egreso} es la clase base abstracta de la que heredan \code{FacturaCompra}, \code{Honorario}, \code{GastoGeneral}, \code{SalarioEmpleado} y \code{Egreso}\allowbreak \code{Factura}\allowbreak \code{Laboratorio}, mapeada por EF Core como \textbf{Table-Per-Hierarchy (TPH)}: una única tabla física \code{egresos} con columna discriminadora \code{Tipo} (\code{TipoEgreso} enum). Cada subtipo solo agrega 1-3 columnas específicas propias (ej. \code{Honorario.}\allowbreak \code{ProfessionalId}, \code{SalarioEmpleado.}\allowbreak \code{EmpleadoId}, \code{GastoGeneral.}\allowbreak \code{CategoriaGastoId}).
+
+\textbf{Consecuencias.} \textbf{Gana:} reportes y consultas de caja/egresos tratan cualquier tipo de salida de dinero de forma uniforme (mismo \code{Estado}, mismo flujo de aprobación/pago) sin necesidad de \code{UNION} entre tablas separadas; agregar un sexto tipo de egreso no requiere tocar la lógica de caja existente, solo un nuevo subtipo más valor de enum.
+
+\textbf{Pierde:} la tabla física \code{egresos} acumula columnas nullable de todos los subtipos (patrón típico y esperado de TPH); cualquier índice o constraint a nivel de un subtipo específico es más difícil de expresar que en tablas separadas (TPT).
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- Grupo C (\code{Egreso}); \hyperref[mod:11-caja-y-egresos]{módulo de Caja y Egresos}.
+
+\section{ADR 0012 --- Cambio de contraseña obligatorio solo para cuentas nuevas}
+\label{adr:0012}
+
+\begin{cajaADR}{ADR 0012 --- Cambio de contraseña solo cuentas nuevas}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} Al implementar el flujo de cambio de contraseña obligatorio para cuentas creadas por un admin (profesionales/empleados dados de alta con una contraseña que ellos no eligieron), había que decidir si aplicar el requisito retroactivamente a las cuentas ya existentes o solo hacia adelante.
+
+\textbf{Decisión.} \code{User.}\allowbreak \code{MustChangePassword} (default \code{false}) solo se setea en \code{true} para cuentas nuevas creadas desde ese momento en adelante (\code{ProfessionalService.}\allowbreak \code{CreateAsync} / \code{EmpleadoService.}\allowbreak \code{CrearAsync}); no hay migración retroactiva sobre cuentas existentes. El admin puede forzar el cambio en cualquier cuenta puntual vía \code{UserService.}\allowbreak \code{ResetPasswordAsync}. El flag no bloquea el login (a diferencia de \code{IsEmailVerified}): el frontend redirige después de autenticar, vía guard de router que cubre también navegación directa y refresh, no solo el login inicial.
+
+\textbf{Consecuencias.} \textbf{Gana:} cambio simple y sin fricción para las cuentas existentes, que no se ven interrumpidas por un requisito retroactivo; el admin conserva la herramienta puntual (reset) para forzar el cambio cuando haga falta caso por caso.
+
+\textbf{Pierde:} cuentas viejas creadas con contraseña temporal antes de esta funcionalidad nunca son forzadas a cambiarla automáticamente --- depende de que el admin lo haga manualmente si le preocupa un caso puntual. No hay invalidación de JWTs ya emitidos al cambiar/resetear una contraseña (limitación conocida, sin infraestructura de revocación).
+\end{cajaADR}
+
+\textbf{Referencias:} Capítulo de \hyperref[sec:arch]{Arquitectura}; \hyperref[mod:01-identidad-y-acceso]{módulo de Identidad y Acceso}.
+
+\section{ADR 0013 --- Auditoría por captura curada en vez de interceptor genérico}
+\label{adr:0013}
+
+\begin{cajaADR}{ADR 0013 --- Auditoría curada en vez de automática}
+\textbf{Estado.} Aceptada (implementada).
+
+\textbf{Contexto.} El sistema necesitaba una bitácora consultable de operaciones sensibles (quién anuló una venta, quién cambió una contraseña, quién aprobó un cierre de caja). La forma más automática de conseguirla en EF Core es un interceptor de \code{SaveChanges} que registre toda entidad modificada, sin tocar ningún servicio de negocio. La alternativa es llamar explícitamente a un servicio de auditoría desde cada punto que se quiera auditar.
+
+\textbf{Decisión.} Captura \textbf{curada y explícita}: \code{IAudit}\allowbreak \code{Service.}\allowbreak \code{LogAsync(accion, descripcion, .}\allowbreak \code{.}\allowbreak \code{.)} se invoca desde el servicio de negocio, \emph{después} de que la operación auditada se haya persistido, y con su propio \code{SaveChanges}. Cada evento aporta una descripción legible en español (``Anuló la venta 0001-45''), no un \emph{diff} de columnas. La acción se elige de un enum-catálogo (\code{AuditAccion}) y la categoría se deriva de ella mediante un mapa único (\code{AuditCatalog}), de modo que no puede quedar clasificada de forma inconsistente entre dos llamadas.
+
+\textbf{Consecuencias.} \textbf{Gana:} la bitácora contiene solo eventos que un administrador efectivamente quiere leer, con una descripción entendible sin conocer el esquema de la base; permite auditar eventos que \emph{no} escriben ninguna entidad --- el caso decisivo es el inicio de sesión fallido, invisible para cualquier interceptor de \code{SaveChanges}; y un fallo al auditar nunca revierte la operación de negocio.
+
+\textbf{Pierde:} instrumentar una operación nueva exige acordarse de agregar la llamada --- si un servicio futuro omite el \code{LogAsync}, la operación simplemente no queda auditada y nada lo advierte. La cobertura es por lo tanto parcial y deliberada (15 acciones en esta versión), no exhaustiva: alta y edición de usuarios, cambios de precio y ajustes de stock quedaron fuera.
+\end{cajaADR}
+
+\textbf{Referencias:} \hyperref[mod:16-auditoria]{módulo de Auditoría}; Capítulo de \hyperref[sec:modelo-datos]{Modelo de Datos} --- § Entidades transversales.

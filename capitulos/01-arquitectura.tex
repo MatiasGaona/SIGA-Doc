@@ -1,0 +1,173 @@
+\chapter{Arquitectura del Sistema}
+\label{sec:arch}
+
+\begin{quote}
+\itshape
+El sistema tiene 37 controllers (235 endpoints), 73 clases de entidad más 31 enums de negocio (104 tipos en 96 archivos de \code{SIGA.}\allowbreak \code{Domain/}\allowbreak \code{Entities}) y 91 vistas de frontend. Este capítulo describe su arquitectura: la organización en capas, el modelo de autorización basado en permisos y el aislamiento multi-sucursal.
+\end{quote}
+
+\section{Visión general}
+\label{sec:arch-vision-general}
+
+SIGA es un sistema de gestión integral para una óptica: identidad y acceso, pacientes/profesionales/clientes/empleados, agenda de turnos, historia clínica, catálogo e inventario (incl.\ catálogo óptico de armazones/tratamientos), ventas (venta directa y ``a pedido'' con receta más laboratorio externo), compras a proveedores, caja, egresos, notificaciones internas y reportes operativos --- todo con soporte \textbf{multi-sucursal} y control de acceso basado en permisos.
+
+Es un monorepo de dos repositorios separados:
+\begin{itemize}
+  \item \textbf{Backend} (\code{SIGA}): ASP.NET Core~\cite{msaspnetcore} Web API (.NET 10), C\#, Entity Framework Core~\cite{msefcore}, PostgreSQL~\cite{postgresql} (hosteado en Neon).
+  \item \textbf{Frontend} (\code{SIGA-Web}): Vue~3~\cite{vuejs} SPA, TypeScript~\cite{typescript}, Vite~\cite{vite} (ver el capítulo de Arquitectura del Frontend).
+\end{itemize}
+
+El modelo de datos gira en torno a la entidad \code{Person} (cualquier individuo físico del sistema --- CI, nombre, contacto). A partir de ahí, roles funcionales (\code{User}, \code{Patient}, \code{Professional}, \code{Cliente}, \code{Empleado}) se cuelgan de \code{Person} según qué necesite hacer esa persona en el sistema. Ver el capítulo de Modelo de Datos para el detalle completo.
+
+\section{Diagrama de componentes}
+\label{sec:arch-diagrama-componentes}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+  \node[capa, minimum width=6.2cm] (web) at (0,8) {SIGA-Web (Vue 3 SPA)\\\footnotesize Vistas / Composables / Services};
+  \node[capa, minimum width=6.2cm] (api) at (0,6) {SIGA.Api\\\footnotesize Controllers, Program.cs, JWT, Policies, Swagger};
+  \node[capa] (app) at (-2.6,4) {SIGA.Application\\\footnotesize Interfaces, DTOs, Result<T>};
+  \node[capa] (dom) at (2.6,4) {SIGA.Domain\\\footnotesize Entities};
+  \node[capa, minimum width=6.2cm] (infra) at (0,2) {SIGA.Infrastructure\\\footnotesize Services, AppDbContext, Configurations, Migrations};
+  \node[externo] (db) at (-3.6,0) {PostgreSQL\\\footnotesize (Neon)};
+  \node[externo] (resend) at (0,0) {Resend\\\footnotesize (email)};
+  \node[externo] (hcaptcha) at (3.6,0) {hCaptcha\\\footnotesize (antibot)};
+
+  \draw[flechaArq] (web) -- node[right,font=\scriptsize] {HTTPS REST + JWT} (api);
+  \draw[flechaArq] (api) -- (app);
+  \draw[flechaArq] (api) -- (dom);
+  \draw[flechaArq, dashed] (infra) -- node[left,font=\scriptsize] {implementa} (app);
+  \draw[flechaArq] (infra) -- (dom);
+  \draw[flechaArq] (infra) -- (db);
+  \draw[flechaArq] (infra) -- (resend);
+  \draw[flechaArq] (infra) -- (hcaptcha);
+\end{tikzpicture}
+\caption{Diagrama de componentes de SIGA: el frontend consume la API vía HTTPS con JWT Bearer; \texttt{SIGA.Api} depende de \texttt{SIGA.Application} y \texttt{SIGA.Domain}; \texttt{SIGA.Infrastructure} implementa los contratos de \texttt{Application} (línea punteada) y depende de \texttt{Domain} y de los servicios externos (PostgreSQL, Resend, hCaptcha).}
+\label{fig:arq-componentes}
+\end{figure}
+
+\section{Capas del backend}
+\label{sec:arch-capas}
+
+\subsection{\texttt{SIGA.Domain}}
+Entidades de dominio puras (\code{Entities/}, 73 clases más 31 enums --- 104 tipos en 96 archivos; 5 archivos declaran más de un tipo: \code{Comprobante.cs}, \code{Devolucion.cs} y \code{Registro}\allowbreak \code{Auditoria.cs} con 2 enums más 1 clase cada uno, y \code{SesionCaja.cs} y \code{Timbrado.cs} con 1 enum más 1 clase; todas en un único namespace plano \code{SIGA.}\allowbreak \code{Domain.}\allowbreak \code{Entities}) y abstracciones de seguridad (\code{Security/}\allowbreak \code{IPasswordHasher}). Sin dependencias hacia afuera --- es la capa más interna.
+
+\subsection{\texttt{SIGA.Application}}
+Contratos que consume \code{SIGA.Api} e implementa \code{SIGA.}\allowbreak \code{Infrastructure}: interfaces de servicio (\code{Interfaces/}\allowbreak \code{IXxxService}), DTOs de request/response (\code{DTOs/}) y el wrapper \code{Common/Result<T>} para modelar éxito/error sin excepciones de control de flujo. No contiene lógica de negocio ni acceso a datos.
+
+\subsection{\texttt{SIGA.Infrastructure}}
+La capa más grande --- contiene toda la lógica de negocio y persistencia:
+\begin{itemize}
+  \item \textbf{\code{Services/}} --- implementación de cada \code{IXxxService} (46 servicios registrados, ver \code{Dependency}\allowbreak \code{Injection}.\allowbreak\code{AddInfrastructure}; 45 interfaces en \code{Application/}\allowbreak \code{Interfaces} --- algunos servicios no exponen interface propia). Un servicio por módulo de negocio (\code{VentaService}, \code{Laboratorio}\allowbreak \code{Service}, \code{EgresoService}, \code{Transferencia}\allowbreak \code{Stock}\allowbreak \code{Service}, etc.), más 2 \code{BackgroundService} (\code{Turno}\allowbreak \code{Reminder}\allowbreak \code{Service}, \code{Stock}\allowbreak \code{Bajo}\allowbreak \code{Notificador}\allowbreak \code{Service}, ver \S\ref{sec:arch-background-services}).
+  \item \textbf{\code{Persistence/}} --- \code{AppDbContext}, \code{Configurations/} (una clase \code{IEntity}\allowbreak \code{Type}\allowbreak \code{Configuration<T>} por entidad, Fluent API --- fuente de verdad de constraints/índices/relaciones reales, más completa que las propiedades de la entidad sola) y \code{Migrations/} (EF Core, 90 migraciones ejecutables --- cada una con su \code{*.Designer.cs}, más el snapshot del modelo).
+  \item \textbf{\code{Security/}} --- \code{Pbkdf2}\allowbreak \code{Password}\allowbreak \code{Hasher}, \code{JwtTokenGenerator}, \code{Current}\allowbreak \code{User}\allowbreak \code{Context} (implementa \code{ICurrent}\allowbreak \code{User}\allowbreak \code{Context}: expone \code{UserId}/\code{SucursalId}/\code{EsGlobal}/\code{TienePermiso} vía \code{IHttp}\allowbreak \code{Context}\allowbreak \code{Accessor}, usado por los servicios transaccionales para filtrar/estampar por sucursal).
+  \item \textbf{\code{Options/}} --- POCOs de configuración (\code{ResendOptions}, \code{HCaptchaOptions}, \code{AppOptions}).
+\end{itemize}
+
+\subsection{\texttt{SIGA.Api}}
+Controllers (37 archivos, uno por recurso --- livianos, delegan a los servicios) y \code{Program.cs}: pipeline HTTP, autenticación JWT, autorización basada en permisos, Swagger y arranque de datos (ver abajo).
+
+\section{Pipeline HTTP y seguridad (\texttt{Program.cs})}
+\label{sec:arch-pipeline}
+
+\begin{enumerate}
+  \item \textbf{Autenticación JWT Bearer} --- \code{Token}\allowbreak \code{Validation}\allowbreak \code{Parameters} valida issuer / audience / lifetime / signing key (\code{Jwt:Issuer}/\allowbreak \code{Jwt:Audience}/\allowbreak \code{Jwt:Secret} en configuración).
+  \item \textbf{Autorización por permisos, no por rol} --- el JWT lleva un claim \code{"permission"} por cada permiso concedido (no un claim de rol). \code{Program.cs} define 55 policies simples (una por permiso: \code{ver_pacientes}, \code{crear_venta}, \code{gestionar_}\allowbreak \code{laboratorio}, etc.) que exigen \code{RequireClaim("permission", perm)}, más 2 policies compuestas con \code{RequireAssertion} para OR de permisos: \code{cancelar_pedido} (creador \code{gestionar_pedidos} O aprobador \code{aprobar_pedidos}) y \code{ver_disponibles} (staff \code{ver_agenda} O paciente autogestionando \code{ver_mis_turnos}) --- 57 policies en total. El seed (\code{DbSeeder.}\allowbreak \code{AllPermissions}) siembra 56 permisos (\code{ver_recepcion} existe en el seed pero no tiene policy declarada en \code{Program.cs} --- asimetría real).
+  \item \code{app.}\allowbreak \code{UseAuthentication()} $\rightarrow$ \code{app.}\allowbreak \code{UseAuthorization()} $\rightarrow$ \code{app.}\allowbreak \code{MapControllers()}.
+  \item \textbf{Arranque} (dentro de un scope, antes de \code{app.Run()}):
+  \begin{itemize}
+    \item \code{db.}\allowbreak \code{Database.}\allowbreak \code{MigrateAsync()} --- aplica migraciones pendientes automáticamente al arrancar (no hay paso manual de \code{dotnet ef database update} en el flujo normal).
+    \item \code{DbSeeder.}\allowbreak \code{SeedAsync(db)} --- siembra catálogos base (roles, permisos, sucursal ``Casa Central'', etc.), idempotente.
+    \item \code{DbSeeder.}\allowbreak \code{SeedAdminAsync(.}\allowbreak \code{.}\allowbreak \code{.}\allowbreak \code{)} --- bootstrap de un usuario admin en \textbf{todos} los entornos (incl.\ producción), credenciales configurables por \code{Seed:AdminEmail}/\code{Seed:Admin}\allowbreak \code{Password}.
+    \item \code{DevDataSeeder.}\allowbreak \code{SeedAsync(.}\allowbreak \code{.}\allowbreak \code{.}\allowbreak \code{)} --- solo en \code{Development}, datos de prueba adicionales.
+  \end{itemize}
+\end{enumerate}
+
+\section{Autorización: permisos, no roles}
+\label{sec:arch-autorizacion}
+
+El sistema es explícitamente \textbf{permission-based}: un \code{Role} es solo una colección con nombre de \code{Permission}s (tabla pivote \code{RolePermission}), y el JWT emite los permisos resueltos, no el nombre del rol. Los controllers protegen cada acción con \code{[Authorize(Policy = "permiso_especifico")]}. Esto permite crear roles ad-hoc desde \code{/roles} sin tocar código. \code{Role.Type} (\code{admin}/\code{professional}/\code{patient}, nullable) es la única noción de ``rol de sistema'' y se usa solo para lógica que necesita distinguir un rol inmutable (ej.\ bootstrap del admin), no para autorización de endpoints.
+
+\section{Multi-sucursal}
+\label{sec:arch-multisucursal}
+
+Casi todo lo transaccional (stock, ventas, caja, timbrado, compras/recepciones, egresos, turnos/agenda, consultas clínicas) está scopeado por \code{SucursalId}. Quedan \textbf{globales}: catálogos (productos, marcas, categorías, servicios, etc.) y personas (\code{Patient}, \code{Cliente}, \code{Professional}, \code{User} de rol admin). El scoping se resuelve centralmente en \code{ICurrent}\allowbreak \code{User}\allowbreak \code{Context}, no repitiendo la lógica en cada servicio. Detalle completo en el capítulo de Modelo de Datos y en el capítulo de módulo de Sucursales (\hyperref[mod:15-sucursales]{Módulo 15 --- Sucursales}).
+
+El aislamiento entre sucursales se implementa de forma declarativa y centralizada: \code{AppDbContext} declara un \emph{Global Query Filter} de Entity Framework Core sobre cada entidad con dimensión de sucursal (\code{HasQueryFilter(e => SucursalFiltro == null || e.SucursalId == SucursalFiltro)}), de modo que toda consulta a esas entidades queda filtrada por la sucursal del usuario autenticado sin que el servicio tenga que recordar hacerlo. \code{SucursalFiltro} es \code{null} para un usuario global (administrador), y en ese caso el filtro no restringe nada. \code{Transferencia}\allowbreak \code{Stock} usa un predicado dual (es visible desde la sucursal de origen y desde la de destino) y \code{Egreso} lo hereda en sus cinco subtipos TPH. La sucursal de escritura la resuelve \code{SucursalResolver.}\allowbreak \code{WriteBranchAsync}.
+
+Dos entidades quedan deliberadamente fuera del filtro global. \code{User}, porque la administración de usuarios necesita verlos a todos. \code{Receta}, porque el flujo de venta a pedido exige poder leer las recetas de un cliente en cualquier sucursal: quien se hizo la receta en una sucursal debe poder comprar los lentes en otra. En \code{Receta} el guard por sucursal se aplica a mano solo donde corresponde, como en los conteos de reportes.
+
+\textbf{Conteo exacto}: 18 objetos con dimensión sucursal. Quince entidades con columna \code{SucursalId} literal (\code{User}, \code{Venta}, \code{MovimientoCaja}, \code{MovimientoStock}, \code{SesionCaja}, \code{StockLote}, \code{Timbrado}, \code{Turno}, \code{ConsultaClinica}, \code{Receta}, \code{Horario}\allowbreak \code{Profesional}, \code{Egreso}, \code{PedidoProveedor}, \code{Recepcion}\allowbreak \code{Mercaderia}, \code{ConteoInventario}); una vista derivada que la arrastra (\code{StockActualView}/\code{vw_stock_actual}); una con la sucursal partida en dos columnas (\code{TransferenciaStock.}\allowbreak \code{SucursalOrigenId} y \code{SucursalDestinoId}); y una con nombre distinto (\code{NotificacionInterna.}\allowbreak \code{DestinatarioSucursalId}, para broadcast). De las quince primeras, el filtro global de EF cubre trece: quedan afuera \code{User} y \code{Receta} por las razones ya explicadas. \code{User.SucursalId} y \code{NotificacionInterna.}\allowbreak \code{DestinatarioSucursalId} son las únicas columnas nullable del grupo (\code{null} = global); en las demás la sucursal es obligatoria.
+
+\section{Módulos de negocio y controllers}
+\label{sec:arch-modulos-controllers}
+
+\begin{longtable}{p{3.6cm}p{10cm}}
+\caption{Mapeo de módulos de negocio a controllers del backend.}
+\label{tab:arch-modulos-controllers}\\
+\toprule
+\textbf{Módulo} & \textbf{Controllers} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Módulo} & \textbf{Controllers} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Identidad y Acceso & \code{AuthController}, \code{UsersController}, \code{RolesController} \\
+Personas & \code{Patients}\allowbreak \code{Controller}, \code{Professionals}\allowbreak \code{Controller}, \code{Clientes}\allowbreak \code{Controller}, \code{Especialidades}\allowbreak \code{Controller} \\
+Personal & \code{Empleados}\allowbreak \code{Controller} \\
+Agenda & \code{TurnosController}, \code{Horarios}\allowbreak \code{Controller} \\
+Clínica & \code{Consultas}\allowbreak \code{Controller}, \code{RecetasController} \\
+Catálogo / Inventario & \code{Productos}\allowbreak \code{Controller}, \code{MarcasController}, \code{Tipo}\allowbreak \code{Lentes}\allowbreak \code{Controller}, \code{Tratamientos}\allowbreak \code{Controller}, \code{Servicios}\allowbreak \code{Controller}, \code{Motivos}\allowbreak \code{Movimiento}\allowbreak \code{Controller}, \code{Stock}\allowbreak \code{Lotes}\allowbreak \code{Controller}, \code{Ubicaciones}\allowbreak \code{Controller} \\
+Ventas & \code{VentasController}, \code{Timbrados}\allowbreak \code{Controller} \\
+Laboratorio & \code{Laboratorio}\allowbreak \code{Controller} \\
+Compras & \code{ComprasController}, \code{Proveedores}\allowbreak \code{Controller}, \code{Facturas}\allowbreak \code{Compra}\allowbreak \code{Controller}, \code{Recepciones}\allowbreak \code{Controller} \\
+Caja y Egresos & \code{CajaController}, \code{EgresosController} \\
+Configuración & \code{Configuracion}\allowbreak \code{Controller}, \code{Estados}\allowbreak \code{Config}\allowbreak \code{Controller} \\
+Sucursales & \code{Sucursales}\allowbreak \code{Controller}, \code{Transferencias}\allowbreak \code{Controller} \\
+Notificaciones & \code{Notificaciones}\allowbreak \code{Controller} \\
+Reportes & \code{Reportes}\allowbreak \code{Controller} \\
+\end{longtable}
+
+El detalle de cada endpoint (verbo, ruta, policy, request/response) está en el Apéndice de Referencia de API. Algunos catálogos menores del dominio (\code{CargoEmpleado}, \code{CategoriaGasto}, \code{CategoriaProducto}, \code{Modelo}, \code{Ciudad}, \code{Departamento}) se gestionan como sub-recursos de otro controller en vez de tener uno propio.
+
+\section{Trabajos en segundo plano}
+\label{sec:arch-background-services}
+
+Dos \code{BackgroundService} registrados en \code{Dependency}\allowbreak \code{Injection}:
+\begin{itemize}
+  \item \textbf{\code{Turno}\allowbreak \code{Reminder}\allowbreak \code{Service}} --- recordatorios de turnos por email.
+  \item \textbf{\code{Stock}\allowbreak \code{Bajo}\allowbreak \code{Notificador}\allowbreak \code{Service}} --- poller cada 30 minutos que compara \code{vw_stock_actual} contra \code{Producto}\allowbreak \code{Stock}\allowbreak \code{Config} por producto más sucursal y genera \code{Notificacion}\allowbreak \code{Interna} de bajo stock (evita duplicar si ya hay una sin leer). Se eligió poller sobre hook inline porque los movimientos de stock ``Aprobado'' se originan desde 5 o más servicios distintos.
+\end{itemize}
+
+\section{Generación de documentos y PDFs}
+\label{sec:arch-pdf}
+
+\textbf{QuestPDF} (licencia Community, seteada en \code{Program.cs} antes del \code{builder}) para: receta óptica (\code{Receta}\allowbreak \code{Pdf}\allowbreak \code{Generator}), movimientos de stock (\code{Movimiento}\allowbreak \code{Stock}\allowbreak \code{Pdf}\allowbreak \code{Generator}) y reportes operativos (\code{ReporteExporter}, que también genera CSV con writer propio UTF-8 más BOM). Los exportadores reciben el DTO, no el HTTP request, para poder reutilizarse desde un futuro job de email.
+
+\section{Integraciones externas}
+\label{sec:arch-integraciones}
+
+\begin{itemize}
+  \item \textbf{PostgreSQL / Neon} --- \code{Npgsql} con retry automático (\code{Enable}\allowbreak \code{Retry}\allowbreak \code{On}\allowbreak \code{Failure}, 5 intentos). En desarrollo, \code{dotnet ef} corre en entorno \code{Production} por defecto y no toma la connection string de Neon --- hay que forzar \code{ASPNETCORE_}\allowbreak \code{ENVIRONMENT=Development}.
+  \item \textbf{Resend} --- envío de email transaccional (verificación de cuenta, notificaciones externas de turnos). \code{HttpClient} nombrado \code{"resend"}.
+  \item \textbf{hCaptcha} --- protección del endpoint público de auto-registro de pacientes. \code{HttpClient} nombrado \code{"hcaptcha"}.
+\end{itemize}
+
+\section{Convenciones}
+\label{sec:arch-convenciones}
+
+\begin{itemize}
+  \item Controllers livianos: reciben el request, llaman al servicio, devuelven \code{To}\allowbreak \code{Http}\allowbreak \code{Response(result)}. Sin lógica de negocio ni acceso a \code{DbContext}.
+  \item DTOs nunca exponen entidades de dominio directamente.
+  \item Paginación: \code{page}/\code{pageSize}/\code{search}/\code{isActive} sí se usan en la práctica, con response shape \texttt{\{ items, totalCount, page, pageSize, totalPages \}}.
+  \item Todos los servicios se registran en \code{SIGA.}\allowbreak \code{Infrastructure.}\allowbreak \code{DependencyInjection.}\allowbreak \code{AddInfrastructure()} --- nunca directamente en \code{Program.cs}.
+\end{itemize}
+
+\section{Frontend como cliente}
+\label{sec:arch-frontend-cliente}
+
+\code{SIGA-Web} consume la API vía HTTP/JSON con el JWT en \code{Authorization: Bearer}. El token trae los claims \code{permission} (uno por permiso), \code{professional_id} (si aplica) y \code{sucursal_id} (si el usuario tiene sucursal fija) --- el frontend los usa para mostrar/ocultar UI, pero la autorización real siempre se re-valida en el backend vía policies. Ver el capítulo de Arquitectura del Frontend (nota: solo aproximadamente 37 de las 56 policies del backend están mapeadas a rutas del router/menú del frontend --- el resto se chequea a nivel de acción con \code{hasPermission} o todavía no se usa en la UI).

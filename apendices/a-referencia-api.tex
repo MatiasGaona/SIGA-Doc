@@ -1,0 +1,451 @@
+\chapter{Referencia de API}
+\label{sec:api-reference}
+
+Inventario completo de los 37 controllers de \code{SIGA.}\allowbreak \code{Api/}\allowbreak \code{Controllers/}\allowbreak \code{*.}\allowbreak \code{cs} (235 endpoints). Agrupado en los mismos 15 módulos de negocio usados en el resto del documento.
+
+\textbf{Cómo leer estas tablas:}
+\begin{itemize}
+  \item \textbf{Ruta:} todas empiezan con \code{/api}, incluido en la propia celda.
+  \item \textbf{Policy:} el nombre exacto de \code{[Authorize(Policy = "...")]}. ``(heredado)'' = el controller entero está protegido por esa policy a nivel de clase, el método no agrega una propia. \code{[Authorize]} sin policy = requiere estar autenticado, cualquier permiso. \code{AllowAnonymous} = público.
+  \item \textbf{Request/Response:} nombre del tipo C\# tal cual en el código. Toda respuesta exitosa devuelve \code{result.Value} envuelto por \code{Result<T>} (ver Capítulo~\ref{sec:arch}). Los controllers heredan de \code{BaseController} (\code{ToHttpResponse}) salvo \code{Empleados}\allowbreak \code{Controller}, que define su propio \code{ToResponse} equivalente.
+\end{itemize}
+
+\section{1. Identidad y Acceso}
+\label{sec:api-identidad}
+
+\subsection{\texttt{AuthController} --- \texttt{/api/auth}}
+\begin{apiTable}{\texttt{AuthController}}{tab:api-auth}
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{auth/}\allowbreak \code{register} & \code{AllowAnonymous} & \code{RegisterRequest} & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{auth/}\allowbreak \code{register/}\allowbreak \code{patient} & \code{AllowAnonymous} & \code{Register}\allowbreak \code{Patient}\allowbreak \code{Request} & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{auth/}\allowbreak \code{verify-email?token=} & \code{AllowAnonymous} & --- (query \code{token}) & --- \\
+POST & \code{/api/auth/login} & \code{AllowAnonymous} & \code{LoginRequest} & \code{Login}\allowbreak \code{Response} (incl.\ \code{jwtToken}, \code{roleClaims}, \code{sucursalId}/\allowbreak \code{sucursal}\allowbreak \code{Nombre}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{auth/}\allowbreak \code{change-password} & \code{[Authorize]} (cualquier autenticado) & \code{Change}\allowbreak \code{Password}\allowbreak \code{Request} & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{auth/}\allowbreak \code{forgot-password} & \code{AllowAnonymous} & \code{Forgot}\allowbreak \code{Password}\allowbreak \code{Request} & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{auth/}\allowbreak \code{reset-password} & \code{AllowAnonymous} & \code{Reset}\allowbreak \code{Password}\allowbreak \code{With}\allowbreak \code{Token}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\subsection{\texttt{UsersController} --- \texttt{/api/users} (\texttt{[Authorize]} a nivel de clase)}
+\begin{apiTable}{\texttt{UsersController}}{tab:api-users}
+GET & \code{/api/users} & \code{ver_usuarios} & --- & listado de usuarios \\
+DELETE & \code{/api/users/{id}} & \code{editar_usuario} & --- & --- (desactiva, soft delete) \\
+PUT & \code{/api/users/{id}/}\allowbreak \code{reset-password} & \code{editar_usuario} & \code{Reset}\allowbreak \code{Password}\allowbreak \code{Request} & --- (reset admin, fuerza cambio en próximo login) \\
+\end{apiTable}
+
+\subsection{\texttt{RolesController} --- \texttt{/api/roles} (\texttt{[Authorize]} a nivel de clase)}
+\begin{apiTable}{\texttt{RolesController}}{tab:api-roles}
+GET & \code{/api/roles} & \code{ver_roles} & --- & listado de roles \\
+GET & \code{/api/roles/{id}} & \code{ver_roles} & --- & detalle de rol \\
+POST & \code{/api/roles} & \code{crear_rol} & \code{RoleRequest} & --- \\
+PUT & \code{/api/roles/{id}} & \code{editar_rol} & \code{RoleRequest} & --- \\
+DELETE & \code{/api/roles/{id}} & \code{eliminar_rol} & --- & --- \\
+GET & \code{/api/roles/{id}/users} & \code{ver_roles} & --- & usuarios que tienen ese rol \\
+\end{apiTable}
+
+\subsection{\texttt{UserRolesController} --- \texttt{/api/users/\{userId\}/roles} (mismo archivo \texttt{RolesController.cs}, \texttt{[Authorize]} a nivel de clase)}
+\begin{apiTable}{\texttt{UserRolesController}}{tab:api-user-roles}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{users/}\allowbreak \code{{userId}/roles} & \code{ver_usuarios} & --- & roles del usuario \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{users/}\allowbreak \code{{userId}/roles} & \code{editar_usuario} & \code{Assign}\allowbreak \code{Role}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{users/}\allowbreak \code{{userId}/roles/{roleId}} & \code{editar_usuario} & --- & --- \\
+\end{apiTable}
+
+\section{2. Personas}
+\label{sec:api-personas}
+
+\subsection{\texttt{PatientsController} --- \texttt{/api/patients} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{PatientsController}}{tab:api-patients}
+GET & \texttt{/api/patients?page\&}\allowbreak \texttt{pageSize\&search\&status} & \code{ver_pacientes} & --- & listado paginado (pageSize máx. 500) \\
+GET & \code{/api/patients/{id}} & \code{ver_pacientes} & --- & detalle \\
+POST & \code{/api/patients} & \code{crear_paciente} & \code{Create}\allowbreak \code{Patient}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/patients/{id}} & \code{editar_paciente} & \code{Update}\allowbreak \code{Patient}\allowbreak \code{Request} & --- \\
+DELETE & \code{/api/patients/{id}} & \code{desactivar_}\allowbreak \code{paciente} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{ProfessionalsController} --- \texttt{/api/professionals} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ProfessionalsController}}{tab:api-professionals}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals} & \code{ver_profesionales} & --- & listado (sin paginar) \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{id}} & \code{ver_profesionales} & --- & detalle \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals} & \code{crear_profesional} & \code{Create}\allowbreak \code{Professional}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{id}} & \code{editar_}\allowbreak \code{profesional} & \code{Update}\allowbreak \code{Professional}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{id}} & \code{editar_}\allowbreak \code{profesional} & --- & --- (desactiva) \\
+\end{apiTable}
+Horarios de profesional viven en un controller aparte, ver \code{Horarios}\allowbreak \code{Controller} (§\ref{sec:api-agenda}).
+
+\subsection{\texttt{ClientesController} --- \texttt{/api/clientes} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ClientesController}}{tab:api-clientes}
+GET & \texttt{/api/clientes?page\&}\allowbreak \texttt{pageSize\&search\&}\allowbreak \texttt{status\&tipo} & \code{ver_clientes} & --- & listado paginado \\
+GET & \code{/api/clientes/{id}} & \code{ver_clientes} & --- & detalle \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{clientes/}\allowbreak \code{buscar-persona?ci=} & \code{crear_cliente} & --- (query \code{ci}) & \code{Person} existente o null --- para reutilizar persona al dar de alta \\
+POST & \code{/api/clientes} & \code{crear_cliente} & \code{Create}\allowbreak \code{Cliente}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/clientes/{id}} & \code{editar_cliente} & \code{Update}\allowbreak \code{Cliente}\allowbreak \code{Request} & --- \\
+DELETE & \code{/api/clientes/{id}} & \code{desactivar_}\allowbreak \code{cliente} & --- & --- (desactiva) \\
+POST & \code{/api/clientes/{id}/}\allowbreak \code{activar} & \code{desactivar_}\allowbreak \code{cliente} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{EspecialidadesController} --- \texttt{/api/especialidades} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{EspecialidadesController}}{tab:api-especialidades}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{especialidades} & \code{[Authorize]} (heredado, sin policy propia) & --- & listado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{especialidades/}\allowbreak \code{{id}} & \code{[Authorize]} (heredado) & --- & detalle \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{especialidades} & \code{gestionar_}\allowbreak \code{especialidades} & \code{Create}\allowbreak \code{Especialidad}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{especialidades/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{especialidades} & \code{Update}\allowbreak \code{Especialidad}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{especialidades/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{especialidades} & --- & --- \\
+\end{apiTable}
+
+\section{3. Personal}
+\label{sec:api-personal}
+
+\subsection{\texttt{EmpleadosController} --- \texttt{/api/empleados} (policy de clase \texttt{ver\_empleados}; usa su propio \texttt{ToResponse}, no \texttt{BaseController})}
+\begin{apiTable}{\texttt{EmpleadosController}}{tab:api-empleados}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados?soloActivos} & \code{ver_empleados} (heredado) & --- & listado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados/}\allowbreak \code{{id}} & \code{ver_empleados} (heredado) & --- & detalle \\
+POST & \code{/api/empleados} & \code{gestionar_}\allowbreak \code{empleados} & \code{Crear}\allowbreak \code{Empleado}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{empleados} & \code{Actualizar}\allowbreak \code{Empleado}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{empleados} & --- & --- (desactiva) \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados/}\allowbreak \code{cargos} & \code{ver_empleados} (heredado) & --- & listado de \code{CargoEmpleado} --- sin controller propio \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados/}\allowbreak \code{cargos} & \code{gestionar_}\allowbreak \code{empleados} & \code{Crear}\allowbreak \code{Cargo}\allowbreak \code{Empleado}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{empleados/}\allowbreak \code{cargos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{empleados} & \code{Actualizar}\allowbreak \code{Cargo}\allowbreak \code{Empleado}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\section{4. Agenda}
+\label{sec:api-agenda}
+
+\subsection{\texttt{TurnosController} --- \texttt{/api/turnos} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{TurnosController}}{tab:api-turnos}
+GET & \texttt{/api/turnos?fecha\&}\allowbreak \texttt{professionalId\&estado\&}\allowbreak \texttt{patientId} & \code{ver_agenda} & --- & listado filtrado \\
+GET & \texttt{/api/turnos/}\allowbreak \texttt{disponibles?}\allowbreak \texttt{professionalId\&fecha\&}\allowbreak \texttt{sucursalId} & \code{ver_disponibles} (OR: \code{ver_agenda} staff u \code{ver_mis_turnos} paciente) & --- & slots libres \\
+GET & \texttt{/api/turnos/}\allowbreak \texttt{profesionales-disponibles?}\allowbreak \texttt{fecha\&sucursalId} & \code{ver_mis_turnos} & --- & profesionales con horario activo --- flujo de reserva del paciente \\
+POST & \code{/api/turnos} & \code{gestionar_agenda} & \code{Create}\allowbreak \code{Turno}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/turnos/{id}/estado} & \code{gestionar_agenda} & \code{Update}\allowbreak \code{Turno}\allowbreak \code{Estado}\allowbreak \code{Request} & --- \\
+DELETE & \code{/api/turnos/{id}} & \code{gestionar_agenda} & --- & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{turnos/}\allowbreak \code{mis-turnos} & \code{ver_mis_turnos} & --- (usa \code{ClaimTypes.}\allowbreak \code{NameIdentifier}) & turnos del paciente autenticado \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{turnos/}\allowbreak \code{self-book} & \code{ver_mis_turnos} & \code{Self}\allowbreak \code{Book}\allowbreak \code{Turno}\allowbreak \code{Request} (incl.\ \code{SucursalId}, obligatorio) & --- \\
+POST & \code{/api/turnos/{id}/}\allowbreak \code{solicitar-cancelacion} & \code{ver_mis_turnos} & --- & --- \\
+POST & \code{/api/turnos/{id}/}\allowbreak \code{gestionar-cancelacion} & \code{gestionar_agenda} & \code{Gestionar}\allowbreak \code{Cancelacion}\allowbreak \code{Request} & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{turnos/}\allowbreak \code{confirmar/}\allowbreak \code{{token}} & \code{AllowAnonymous} & --- (token en URL, del email de confirmación) & --- \\
+\end{apiTable}
+
+\subsection{\texttt{HorariosController} --- \texttt{/api/professionals/}\allowbreak \texttt{\{professionalId\}} (\texttt{[Authorize]}, anidado bajo Professionals)}
+\begin{apiTable}{\texttt{HorariosController}}{tab:api-horarios}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{professionalId}/}\allowbreak \code{horarios} & \code{ver_profesionales} & --- & horarios semanales \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{professionalId}/}\allowbreak \code{horarios} & \code{editar_}\allowbreak \code{profesional} & \code{Set}\allowbreak \code{Horarios}\allowbreak \code{Request} & --- (reemplaza el set completo por sucursal del usuario) \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{professionalId}/}\allowbreak \code{bloqueos} & \code{ver_profesionales} & --- & fechas bloqueadas \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{professionalId}/}\allowbreak \code{bloqueos} & \code{editar_}\allowbreak \code{profesional} & \code{Bloqueo}\allowbreak \code{Fecha}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{professionals/}\allowbreak \code{{professionalId}/}\allowbreak \code{bloqueos/{bloqueoId}} & \code{editar_}\allowbreak \code{profesional} & --- & --- \\
+\end{apiTable}
+
+\section{5. Clínica}
+\label{sec:api-clinica}
+
+\subsection{\texttt{ConsultasController} --- \texttt{/api/consultas} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ConsultasController}}{tab:api-consultas}
+GET & \texttt{/api/consultas?page\&}\allowbreak \texttt{pageSize\&search\&}\allowbreak \texttt{patientId\&}\allowbreak \texttt{professionalId} & \code{ver_consultas} & --- & listado paginado; si el caller es profesional se auto-filtra a sus propias consultas \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{patient/}\allowbreak \code{{patientId}} & \code{ver_consultas} & --- & consultas de un paciente \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}} & \code{ver_consultas} & --- & detalle \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{profesional/}\allowbreak \code{stats} & \code{ver_consultas} & --- (requiere claim \code{professional_id}, si no 403) & estadísticas del profesional autenticado \\
+POST & \code{/api/consultas} & \code{registrar_}\allowbreak \code{consulta} & \code{Create}\allowbreak \code{Consulta}\allowbreak \code{Clinica}\allowbreak \code{Request} & --- (si el caller es profesional, fuerza \code{ProfessionalId} al propio) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}} & \code{editar_consulta} & \code{Update}\allowbreak \code{Consulta}\allowbreak \code{Clinica}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}} & \code{eliminar_consulta} & --- & --- \\
+PATCH & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}/estado} & \code{editar_consulta} & \code{Cambiar}\allowbreak \code{Estado}\allowbreak \code{Consulta}\allowbreak \code{Request} & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}/receta} & \code{editar_consulta} & \code{Create}\allowbreak \code{Receta}\allowbreak \code{Request} & --- (crea o actualiza la receta 1:1 de la consulta) \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}/receta/pdf} & \code{ver_consultas} & --- & PDF (QuestPDF) --- 404 si no tiene receta \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{mis-consultas} & \code{ver_mis_turnos} & --- & portal del paciente --- sus propias consultas \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{consultas/}\allowbreak \code{{id}/mi-receta/pdf} & \code{ver_mis_turnos} & --- & portal del paciente --- PDF de su propia receta \\
+\end{apiTable}
+
+\subsection{\texttt{RecetasController} --- \texttt{/api/recetas} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{RecetasController}}{tab:api-recetas}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{recetas?clienteId=} & \code{ver_ventas} & --- & recetas del cliente (clínicas + manuales) --- flujo de venta a pedido \\
+POST & \code{/api/recetas} & \code{registrar_venta} & \code{Create}\allowbreak \code{Receta}\allowbreak \code{Manual}\allowbreak \code{Request} & --- (receta externa, sin \code{Consulta}\allowbreak \code{ClinicaId}, vinculada directo a un cliente) \\
+\end{apiTable}
+
+\section{6. Catálogo / Inventario}
+\label{sec:api-catalogo}
+
+\subsection{\texttt{ProductosController} --- \texttt{/api/productos} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ProductosController}}{tab:api-productos}
+GET & \texttt{/api/productos?page\&}\allowbreak \texttt{pageSize\&search\&}\allowbreak \texttt{categoria\&bajoStock\&}\allowbreak \texttt{tipoCategoria} & \code{ver_inventario} & --- & listado paginado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}} & \code{ver_inventario} & --- & detalle \\
+POST & \code{/api/productos} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Producto}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Producto}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- (desactiva) \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}/permanente} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- (borrado físico) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}/movimientos} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Movimiento}\allowbreak \code{Stock}\allowbreak \code{Request} & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}/movimientos} & \code{ver_inventario} & --- & movimientos de un producto \\
+GET & \texttt{/api/productos/}\allowbreak \texttt{movimientos?page\&}\allowbreak \texttt{pageSize\&tipo\&estado} & \code{ver_inventario} & --- & movimientos globales \\
+PATCH & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{movimientos/}\allowbreak \code{{id}/estado} & \code{gestionar_}\allowbreak \code{inventario} & \code{Aprobar}\allowbreak \code{Rechazar}\allowbreak \code{Movimiento}\allowbreak \code{Request} & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{movimientos/}\allowbreak \code{{id}/pdf} & \code{ver_inventario} & --- & PDF de comprobante de movimiento \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}/stock-config} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Stock}\allowbreak \code{Config}\allowbreak \code{Request} & --- (mín/máx, global --- ver Capítulo~\ref{sec:modelo-datos}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}/imagen} & \code{gestionar_}\allowbreak \code{inventario} & \code{IFormFile} (máx.\ 5MB, multipart) & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{{id}/imagen} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{categorias} & \code{ver_inventario} & --- & listado de \code{Categoria}\allowbreak \code{Producto} --- sin controller propio \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{categorias} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Categoria}\allowbreak \code{Producto}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{categorias/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Categoria}\allowbreak \code{Producto}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{categorias/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- (desactiva) \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{productos/}\allowbreak \code{categorias/}\allowbreak \code{{id}/permanente} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- (borrado físico) \\
+\end{apiTable}
+
+\subsection{\texttt{MarcasController} --- \texttt{/api/marcas} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{MarcasController}}{tab:api-marcas}
+GET & \code{/api/marcas} & \code{ver_inventario} & --- & listado \\
+POST & \code{/api/marcas} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Marca}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/marcas/{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Marca}\allowbreak \code{Request} & --- \\
+DELETE & \code{/api/marcas/{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{marcas/}\allowbreak \code{modelos?marcaId} & \code{ver_inventario} & --- & listado de \code{Modelo} --- sin controller propio \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{marcas/}\allowbreak \code{modelos} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Modelo}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{marcas/}\allowbreak \code{modelos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Modelo}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{marcas/}\allowbreak \code{modelos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{TipoLentesController} --- \texttt{/api/tipos-lente} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{TipoLentesController}}{tab:api-tipos-lente}
+GET & \code{/api/tipos-lente} & \code{ver_inventario} & --- & listado \\
+POST & \code{/api/tipos-lente} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Tipo}\allowbreak \code{Lente}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{tipos-lente/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Tipo}\allowbreak \code{Lente}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{tipos-lente/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- (desactiva) \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{tipos-lente/}\allowbreak \code{{id}/permanente} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{TratamientosController} --- \texttt{/api/tratamientos} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{TratamientosController}}{tab:api-tratamientos}
+GET & \code{/api/tratamientos} & \code{ver_inventario} & --- & listado \\
+POST & \code{/api/tratamientos} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Tratamiento}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{tratamientos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Tratamiento}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{tratamientos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{ServiciosController} --- \texttt{/api/servicios} (\texttt{[Authorize]})}
+
+\begin{apiTable}{\texttt{ServiciosController}}{tab:api-servicios}
+GET & \code{/api/servicios} & \code{ver_ventas} & --- & listado \\
+POST & \code{/api/servicios} & \code{gestionar_ventas} & \code{Create}\allowbreak \code{Servicio}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{servicios/}\allowbreak \code{{id}} & \code{gestionar_ventas} & \code{Update}\allowbreak \code{Servicio}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{servicios/}\allowbreak \code{{id}} & \code{gestionar_ventas} & --- & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{servicios/}\allowbreak \code{{id}/tarifas} & \code{gestionar_ventas} & \code{Create}\allowbreak \code{Servicio}\allowbreak \code{Tarifa}\allowbreak \code{Request} & --- (precio por profesional/especialidad) \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{servicios/}\allowbreak \code{tarifas/}\allowbreak \code{{tarifaId}} & \code{gestionar_ventas} & --- & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{servicios/}\allowbreak \code{{id}/precio?}\allowbreak \code{professionalId} & \code{ver_ventas} & --- & resuelve el precio aplicable (tarifa específica o default) \\
+\end{apiTable}
+
+\subsection{\texttt{MotivosMovimientoController} --- \texttt{/api/motivos-movimiento} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{MotivosMovimientoController}}{tab:api-motivos-movimiento}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{motivos-movimiento?tipo} & \code{ver_inventario} & --- & listado, filtrable por tipo de movimiento \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{motivos-movimiento} & \code{gestionar_}\allowbreak \code{inventario} & \code{Create}\allowbreak \code{Motivo}\allowbreak \code{Movimiento}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{motivos-movimiento/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & \code{Update}\allowbreak \code{Motivo}\allowbreak \code{Movimiento}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{motivos-movimiento/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{inventario} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{StockLotesController} --- \texttt{/api/stock/lotes} (policy de clase \texttt{ver\_inventario})}
+\begin{apiTable}{\texttt{StockLotesController}}{tab:api-stock-lotes}
+GET & \texttt{/api/stock/lotes?}\allowbreak \texttt{productoId\&vencidos} & \code{ver_inventario} (heredado) & --- & lotes con trazabilidad de vencimiento \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{stock/}\allowbreak \code{lotes/}\allowbreak \code{conteo} & \code{ver_inventario} (heredado) & \code{Registrar}\allowbreak \code{Conteo}\allowbreak \code{Request} & registra un conteo físico de inventario \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{stock/}\allowbreak \code{lotes/}\allowbreak \code{conteos?estado} & \code{ver_inventario} (heredado) & --- & listado de conteos \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{stock/}\allowbreak \code{lotes/}\allowbreak \code{conteos/}\allowbreak \code{{id}} & \code{ver_inventario} (heredado) & --- & detalle de conteo (diferencias sistema-vs-físico) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{stock/}\allowbreak \code{lotes/}\allowbreak \code{conteos/}\allowbreak \code{{id}/gestionar} & \code{gestionar_}\allowbreak \code{inventario} & \code{Gestionar}\allowbreak \code{Conteo}\allowbreak \code{Request} & aprueba/rechaza el conteo (ajusta stock si corresponde) \\
+\end{apiTable}
+
+\subsection{\texttt{UbicacionesController} --- \texttt{/api/ubicaciones} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{UbicacionesController}}{tab:api-ubicaciones}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{ubicaciones/}\allowbreak \code{departamentos?isActive} & \code{[Authorize]} (heredado) & --- & listado de \code{Departamento} \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{ubicaciones/}\allowbreak \code{departamentos} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Create}\allowbreak \code{Departamento}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{ubicaciones/}\allowbreak \code{departamentos/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Update}\allowbreak \code{Departamento}\allowbreak \code{Request} & --- \\
+GET & \texttt{/api/ubicaciones/}\allowbreak \texttt{ciudades?}\allowbreak \texttt{departamentoId\&}\allowbreak \texttt{isActive} & \code{[Authorize]} (heredado) & --- & listado de \code{Ciudad} \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{ubicaciones/}\allowbreak \code{ciudades} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Create}\allowbreak \code{Ciudad}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{ubicaciones/}\allowbreak \code{ciudades/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Update}\allowbreak \code{Ciudad}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\section{7. Ventas}
+\label{sec:api-ventas}
+
+\subsection{\texttt{VentasController} --- \texttt{/api/ventas} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{VentasController}}{tab:api-ventas}
+GET & \texttt{/api/ventas?estado\&}\allowbreak \texttt{tipo\&fechaDesde\&}\allowbreak \texttt{fechaHasta\&clienteId\&}\allowbreak \texttt{page\&pageSize} & \code{ver_ventas} & --- & listado paginado \\
+GET & \code{/api/ventas/{id}} & \code{ver_ventas} & --- & detalle \\
+POST & \code{/api/ventas} & \code{registrar_venta} & \code{Crear}\allowbreak \code{Venta}\allowbreak \code{Request} --- incluye el bloque opcional \code{Trabajo}\allowbreak \code{Pedido} de la venta ``a pedido'' (ver Capítulo~\ref{mod:08-ventas}) & --- \\
+PUT & \code{/api/ventas/{id}} & \code{registrar_venta} & \code{Actualizar}\allowbreak \code{Venta}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/ventas/{id}/}\allowbreak \code{confirmar} & \code{registrar_venta} & --- (usa \code{CurrentUserId}) & --- (pasa de borrador a confirmada; exige \code{RecetaId} si es a pedido) \\
+DELETE & \code{/api/ventas/{id}} & \code{registrar_venta} & --- & --- (elimina presupuesto, no venta confirmada) \\
+PUT & \code{/api/ventas/{id}/}\allowbreak \code{cancelar} & \code{registrar_venta} & \code{Cancelar}\allowbreak \code{Venta}\allowbreak \code{Request} & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{ventas/}\allowbreak \code{cobros-pendientes} & \code{ver_ventas} & --- & ventas a crédito con saldo pendiente \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{ventas/}\allowbreak \code{cobros} & \code{registrar_venta} & \code{Registrar}\allowbreak \code{Cobro}\allowbreak \code{Request} & --- \\
+POST & \code{/api/ventas/{id}/}\allowbreak \code{comprobante} & \code{registrar_venta} & --- (usa \code{CurrentUserId}) & --- (emite comprobante, agrega ingreso a caja si no hay cobros previos) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{ventas/}\allowbreak \code{facturas} & \code{registrar_venta} & \code{Emitir}\allowbreak \code{Factura}\allowbreak \code{Request} & --- \\
+POST & \code{/api/ventas/{id}/}\allowbreak \code{devoluciones} & \code{registrar_venta} & \code{Solicitar}\allowbreak \code{Devolucion}\allowbreak \code{Request} & --- \\
+GET & \code{/api/ventas/{id}/}\allowbreak \code{devoluciones} & \code{ver_ventas} & --- & devoluciones de una venta \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{ventas/}\allowbreak \code{devoluciones/}\allowbreak \code{{devolucionId}/gestionar} & \code{gestionar_ventas} & \code{Gestionar}\allowbreak \code{Devolucion}\allowbreak \code{Request} & --- (aprobar/rechazar) \\
+\end{apiTable}
+
+\subsection{\texttt{TimbradosController} --- \texttt{/api/timbrados} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{TimbradosController}}{tab:api-timbrados}
+GET & \code{/api/timbrados} & \code{ver_ventas} & --- & listado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{timbrados/}\allowbreak \code{activos} & \code{ver_ventas} & --- & timbrados vigentes (por sucursal) \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{timbrados/}\allowbreak \code{{id}} & \code{ver_ventas} & --- & detalle \\
+POST & \code{/api/timbrados} & \code{gestionar_ventas} & \code{Create}\allowbreak \code{Timbrado}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{timbrados/}\allowbreak \code{{id}} & \code{gestionar_ventas} & \code{Update}\allowbreak \code{Timbrado}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{timbrados/}\allowbreak \code{{id}} & \code{gestionar_ventas} & --- & --- \\
+\end{apiTable}
+
+\section{8. Laboratorio}
+\label{sec:api-laboratorio}
+
+\subsection{\texttt{LaboratorioController} --- \texttt{/api/laboratorio} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{LaboratorioController}}{tab:api-laboratorio}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{laboratorio/}\allowbreak \code{pedidos?estado} & \code{ver_laboratorio} & --- & listado de \code{TrabajoPedido} (excluye \code{Borrador}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{laboratorio/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/gestionar} & \code{gestionar_}\allowbreak \code{laboratorio} & \code{Gestionar}\allowbreak \code{Trabajo}\allowbreak \code{Pedido}\allowbreak \code{Request} & --- (aprobar/rechazar, pasa de \code{Pendiente}\allowbreak \code{Aprobacion}) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{laboratorio/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/enviar} & \code{gestionar_}\allowbreak \code{laboratorio} & \code{Registrar}\allowbreak \code{Envio}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{laboratorio/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/recibir} & \code{gestionar_}\allowbreak \code{laboratorio} & --- & --- (NO cambia el estado de la venta --- cobro desacoplado, ver \hyperref[adr:0006]{ADR 0006}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{laboratorio/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/factura} & \code{gestionar_}\allowbreak \code{laboratorio} & \code{Emitir}\allowbreak \code{Factura}\allowbreak \code{Laboratorio}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\section{9. Compras}
+\label{sec:api-compras}
+
+\subsection{\texttt{ComprasController} --- \texttt{/api/compras/pedidos} (clase: \texttt{gestionar\_pedidos})}
+\begin{apiTable}{\texttt{ComprasController}}{tab:api-compras}
+GET & \texttt{/api/compras/pedidos?}\allowbreak \texttt{proveedorId\&estado\&}\allowbreak \texttt{page\&pageSize} & \code{ver_inventario} & --- & listado paginado de OC \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos/}\allowbreak \code{{id}} & \code{ver_inventario} & --- & detalle \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos} & \code{gestionar_pedidos} (heredado) & \code{Crear}\allowbreak \code{Pedido}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos/}\allowbreak \code{{id}} & \code{gestionar_pedidos} (heredado) & \code{Crear}\allowbreak \code{Pedido}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/confirmar} & \code{aprobar_pedidos} & --- & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/factura} & \code{gestionar_pedidos} (heredado) & \code{Registrar}\allowbreak \code{Factura}\allowbreak \code{Pedido}\allowbreak \code{Request} & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/devolucion} & \code{gestionar_pedidos} (heredado) & \code{Registrar}\allowbreak \code{Devolucion}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{pedidos/}\allowbreak \code{{id}/cancelar} & \code{cancelar_pedido} (OR: creador \code{gestionar_pedidos} / aprobador \code{aprobar_pedidos}) & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{ProveedoresController} --- \texttt{/api/proveedores} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ProveedoresController}}{tab:api-proveedores}
+GET & \texttt{/api/proveedores?page\&}\allowbreak \texttt{pageSize\&search\&}\allowbreak \texttt{isActive} & \code{ver_inventario} & --- & listado paginado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{proveedores/}\allowbreak \code{laboratorios} & \code{ver_inventario} & --- & subconjunto marcado como laboratorio óptico \\
+POST & \code{/api/proveedores} & \code{gestionar_pedidos} & \code{Create}\allowbreak \code{Proveedor}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{proveedores/}\allowbreak \code{{id}} & \code{gestionar_pedidos} & \code{Create}\allowbreak \code{Proveedor}\allowbreak \code{Request} (se reutiliza para update) & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{proveedores/}\allowbreak \code{{id}} & \code{gestionar_pedidos} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{FacturasCompraController} --- \texttt{/api/compras/facturas} (policy de clase \texttt{ver\_inventario})}
+\begin{apiTable}{\texttt{FacturasCompraController}}{tab:api-facturas-compra}
+GET & \texttt{/api/compras/facturas?}\allowbreak \texttt{proveedorId\&}\allowbreak \texttt{condicionVenta\&estado\&}\allowbreak \texttt{origen\&fechaDesde\&}\allowbreak \texttt{fechaHasta\&search\&}\allowbreak \texttt{page\&pageSize} & \code{ver_inventario} (heredado) & --- & listado paginado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{facturas/}\allowbreak \code{{id}} & \code{ver_inventario} (heredado) & --- & detalle \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{facturas} & \code{gestionar_pedidos} & \code{Registrar}\allowbreak \code{Factura}\allowbreak \code{Directa}\allowbreak \code{Request} & --- (factura sin OC previa) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{facturas/}\allowbreak \code{{id}/anular} & \code{gestionar_pedidos} & \code{Anular}\allowbreak \code{Factura}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\subsection{\texttt{RecepcionesController} --- \texttt{/api/compras/recepciones} (policy de clase \texttt{ver\_inventario})}
+\begin{apiTable}{\texttt{RecepcionesController}}{tab:api-recepciones}
+GET & \texttt{/api/compras/}\allowbreak \texttt{recepciones?}\allowbreak \texttt{proveedorId\&estadoOC\&}\allowbreak \texttt{fechaDesde\&fechaHasta\&}\allowbreak \texttt{page\&pageSize} & \code{ver_inventario} (heredado) & --- & listado paginado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{recepciones/}\allowbreak \code{{id}} & \code{ver_inventario} (heredado) & --- & detalle \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{recepciones/}\allowbreak \code{facturas-disponibles} & \code{ver_inventario} (heredado) & --- & facturas de compra sin recepción asociada \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{compras/}\allowbreak \code{recepciones} & \code{gestionar_pedidos} & \code{Registrar}\allowbreak \code{Recepcion}\allowbreak \code{Request} & --- (usa \code{CurrentUserId}; genera \code{MovimientoStock} de entrada más \code{StockLote}) \\
+\end{apiTable}
+
+\section{10. Caja y Egresos}
+\label{sec:api-caja-egresos}
+
+\subsection{\texttt{CajaController} --- \texttt{/api/caja} (policy de clase \texttt{ver\_ventas})}
+\begin{apiTable}{\texttt{CajaController}}{tab:api-caja}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{resumen?fecha} & \code{ver_ventas} (heredado) & --- & resumen del día \\
+GET & \texttt{/api/caja/movimientos?}\allowbreak \texttt{fechaDesde\&fechaHasta\&}\allowbreak \texttt{tipo\&page\&pageSize} & \code{ver_ventas} (heredado) & --- & listado paginado de \code{MovimientoCaja} \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{sesion-actual} & \code{ver_ventas} (heredado) & --- & \code{SesionCaja} abierta del usuario/sucursal \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{apertura-sugerida} & \code{ver_ventas} (heredado) & --- & monto de apertura sugerido \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{sesiones} & \code{gestionar_caja} & \code{Abrir}\allowbreak \code{Sesion}\allowbreak \code{Request} & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{sesiones/}\allowbreak \code{{id}} & \code{ver_ventas} (heredado) & --- & detalle de sesión \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{sesiones/}\allowbreak \code{{id}/cerrar} & \code{gestionar_caja} & \code{Cerrar}\allowbreak \code{Sesion}\allowbreak \code{Request} & --- (pasa a \code{Pendiente}\allowbreak \code{Aprobacion} según tolerancia) \\
+GET & \texttt{/api/caja/sesiones?}\allowbreak \texttt{page\&pageSize\&estado} & \code{ver_ventas} (heredado) & --- & historial de sesiones \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{sesiones/}\allowbreak \code{{id}/aprobar-cierre} & \code{aprobar_}\allowbreak \code{cierres_}\allowbreak \code{caja} & --- & --- \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{caja/}\allowbreak \code{sesiones/}\allowbreak \code{{id}/rechazar-cierre} & \code{aprobar_}\allowbreak \code{cierres_}\allowbreak \code{caja} & \code{Rechazar}\allowbreak \code{Cierre}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\subsection{\texttt{EgresosController} --- \texttt{/api/egresos} (policy de clase \texttt{gestionar\_egresos})}
+\begin{apiTable}{\texttt{EgresosController}}{tab:api-egresos}
+GET & \texttt{/api/egresos?tipo\&}\allowbreak \texttt{estado\&fechaDesde\&}\allowbreak \texttt{fechaHasta\&}\allowbreak \texttt{soloVencidos\&page\&}\allowbreak \texttt{pageSize} & \code{ver_egresos} & --- & listado paginado (\code{Egreso}, jerarquía TPH) \\
+GET & \code{/api/egresos/{id}} & \code{ver_egresos} & --- & detalle \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{facturas} & \code{gestionar_egresos} (heredado) & \code{Crear}\allowbreak \code{Factura}\allowbreak \code{Compra}\allowbreak \code{Request} & --- (subtipo \code{FacturaCompra}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{honorarios} & \code{gestionar_egresos} (heredado) & \code{Crear}\allowbreak \code{Honorario}\allowbreak \code{Request} & --- (subtipo \code{Honorario}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{salarios} & \code{gestionar_egresos} (heredado) & \code{Crear}\allowbreak \code{Salario}\allowbreak \code{Request} & --- (subtipo \code{SalarioEmpleado}) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{gastos} & \code{gestionar_egresos} (heredado) & \code{Crear}\allowbreak \code{Gasto}\allowbreak \code{General}\allowbreak \code{Request} & --- (subtipo \code{GastoGeneral}) \\
+PUT & \code{/api/egresos/{id}/}\allowbreak \code{aprobar} & \code{aprobar_egresos} & --- & --- \\
+PUT & \code{/api/egresos/{id}/}\allowbreak \code{rechazar} & \code{aprobar_egresos} & \code{Rechazar}\allowbreak \code{Egreso}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/egresos/{id}/pago} & \code{pagar_egresos} (override explícito a nivel de método, no hereda \code{gestionar_egresos} de la clase --- pago externo exige además el claim \code{aprobar_egresos} y \code{MotivoExterno} obligatorio) & \code{Registrar}\allowbreak \code{Pago}\allowbreak \code{Request} & --- \\
+PUT & \code{/api/egresos/{id}/anular} & \code{gestionar_egresos} (heredado) & \code{Anular}\allowbreak \code{Egreso}\allowbreak \code{Request} & --- \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{categorias} & \code{ver_egresos} & --- & listado de \code{CategoriaGasto} --- sin controller propio \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{categorias} & \code{gestionar_egresos} (heredado) & \code{Crear}\allowbreak \code{Categoria}\allowbreak \code{Gasto}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{egresos/}\allowbreak \code{categorias/}\allowbreak \code{{id}} & \code{gestionar_egresos} (heredado) & \code{Actualizar}\allowbreak \code{Categoria}\allowbreak \code{Gasto}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\section{11. Configuración}
+\label{sec:api-configuracion}
+
+\subsection{\texttt{ConfiguracionController} --- \texttt{/api/configuracion} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ConfiguracionController}}{tab:api-configuracion}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{configuracion} & \code{[Authorize]} (heredado) & --- & \code{Configuracion}\allowbreak \code{Negocio} (singleton) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{configuracion} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Update}\allowbreak \code{Configuracion}\allowbreak \code{Negocio}\allowbreak \code{Request} & --- \\
+\end{apiTable}
+
+\subsection{\texttt{EstadosConfigController} --- \texttt{/api/estados-config} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{EstadosConfigController}}{tab:api-estados-config}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{estados-config?entidad} & \code{[Authorize]} (heredado) & --- & estados cosméticos configurables por entidad (ej.\ \code{EstadoConfig} de Turnos) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{estados-config} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Create}\allowbreak \code{Estado}\allowbreak \code{Config}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{estados-config/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{configuracion} & \code{Update}\allowbreak \code{Estado}\allowbreak \code{Config}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{estados-config/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{configuracion} & --- & --- \\
+\end{apiTable}
+
+\section{12. Sucursales}
+\label{sec:api-sucursales}
+
+\subsection{\texttt{SucursalesController} --- \texttt{/api/sucursales} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{SucursalesController}}{tab:api-sucursales}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{sucursales?soloActivas} & \code{[Authorize]} (heredado --- lectura abierta a cualquier autenticado, incl.\ pacientes, para el flujo de reserva de turno) & --- & listado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{sucursales/}\allowbreak \code{{id}} & \code{[Authorize]} (heredado) & --- & detalle \\
+POST & \code{/api/sucursales} & \code{gestionar_}\allowbreak \code{sucursales} & \code{Create}\allowbreak \code{Sucursal}\allowbreak \code{Request} & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{sucursales/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{sucursales} & \code{Update}\allowbreak \code{Sucursal}\allowbreak \code{Request} & --- \\
+DELETE & \code{/}\allowbreak \code{api/}\allowbreak \code{sucursales/}\allowbreak \code{{id}} & \code{gestionar_}\allowbreak \code{sucursales} & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{TransferenciasController} --- \texttt{/api/transferencias} (policy de clase \texttt{transferir\_stock})}
+\begin{apiTable}{\texttt{TransferenciasController}}{tab:api-transferencias}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{transferencias?estado} & \code{transferir_stock} (heredado) & --- & listado \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{transferencias} & \code{transferir_stock} (heredado) & \code{Create}\allowbreak \code{Transferencia}\allowbreak \code{Request} & --- (Salida en origen, estado Pendiente) \\
+POST & \code{/}\allowbreak \code{api/}\allowbreak \code{transferencias/}\allowbreak \code{{id}/gestionar} & \code{transferir_stock} (heredado) & \code{Gestionar}\allowbreak \code{Transferencia}\allowbreak \code{Request} & --- (aceptar = Entrada en destino; rechazar = Entrada de vuelta al origen; solo el destino gestiona) \\
+\end{apiTable}
+
+\section{13. Notificaciones}
+\label{sec:api-notificaciones}
+
+\subsection{\texttt{NotificacionesController} --- \texttt{/api/notificaciones} (policy de clase \texttt{ver\_notificaciones})}
+\begin{apiTable}{\texttt{NotificacionesController}}{tab:api-notificaciones}
+GET & \texttt{/api/notificaciones?}\allowbreak \texttt{soloNoLeidas\&page\&}\allowbreak \texttt{pageSize} & \code{ver_}\allowbreak \code{notificaciones} (heredado) & --- & notificaciones del usuario autenticado \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{contador} & \code{ver_}\allowbreak \code{notificaciones} (heredado) & --- & cantidad de no leídas (para el badge) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{{id}/leer} & \code{ver_}\allowbreak \code{notificaciones} (heredado) & --- & --- \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{leer-todas} & \code{ver_}\allowbreak \code{notificaciones} (heredado) & --- & --- \\
+\end{apiTable}
+
+\subsection{\texttt{NotificacionPreferencias}\allowbreak \texttt{Controller} --- \texttt{/api/notificaciones/}\allowbreak \texttt{preferencias} (\texttt{[Authorize]} a nivel de clase)}
+\begin{apiTable}{\texttt{NotificacionPreferencias}\allowbreak \texttt{Controller}}{tab:api-notificacion-preferencias}
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{preferencias/}\allowbreak \code{me} & \code{[Authorize]} (cualquier autenticado) & --- & preferencias del usuario autenticado (defaults si no hay fila) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{preferencias/}\allowbreak \code{me} & \code{[Authorize]} (cualquier autenticado) & \code{Update}\allowbreak \code{Notificacion}\allowbreak \code{Preferencia}\allowbreak \code{Request} & \code{Notificacion}\allowbreak \code{Preferencia}\allowbreak \code{Response} \\
+GET & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{preferencias/}\allowbreak \code{persona/{personId}} & \code{gestionar_}\allowbreak \code{notificaciones} & --- & preferencias de una persona (staff) \\
+PUT & \code{/}\allowbreak \code{api/}\allowbreak \code{notificaciones/}\allowbreak \code{preferencias/}\allowbreak \code{persona/{personId}} & \code{gestionar_}\allowbreak \code{notificaciones} & \code{Update}\allowbreak \code{Notificacion}\allowbreak \code{Preferencia}\allowbreak \code{Request} & \code{Notificacion}\allowbreak \code{Preferencia}\allowbreak \code{Response} \\
+\end{apiTable}
+
+\section{14. Reportes}
+\label{sec:api-reportes}
+
+\subsection{\texttt{ReportesController} --- \texttt{/api/reportes} (\texttt{[Authorize]})}
+\begin{apiTable}{\texttt{ReportesController}}{tab:api-reportes}
+GET & \texttt{/api/reportes/ventas?}\allowbreak \texttt{desde\&hasta\&agrupacion} & \code{ver_reportes} & --- & serie temporal agregada (día/semana/mes) \\
+GET & \texttt{/api/reportes/citas?}\allowbreak \texttt{desde\&hasta\&agrupacion} & \code{ver_reportes} & --- & turnos más consultas más recetas agregado \\
+GET & \texttt{/api/reportes/}\allowbreak \texttt{inventario?desde\&}\allowbreak \texttt{hasta\&agrupacion} & \code{ver_reportes} & --- & snapshot de stock (valorización, crítico, por categoría) más movimientos del rango \\
+GET & \texttt{/api/reportes/compras?}\allowbreak \texttt{desde\&hasta\&agrupacion} & \code{ver_inventario} & --- & OC, facturas, recepciones, compras por proveedor \\
+GET & \texttt{/api/reportes/}\allowbreak \texttt{operativo/}\allowbreak \texttt{\{tipo\}?desde\&hasta\&}\allowbreak \texttt{sucursalId\&metodoPago\&}\allowbreak \texttt{categoria\&operadorId\&}\allowbreak \texttt{tipoMov\&page\&pageSize} & \code{ver_reportes} & --- (\code{tipo}: ventas \textbar\ compras \textbar\ inventario \textbar\ caja) & listado operativo paginado y filtrable \\
+GET & \texttt{/api/reportes/}\allowbreak \texttt{operativo/}\allowbreak \texttt{\{tipo\}/export?formato\&}\allowbreak \texttt{...} (mismos filtros, sin paginar) & \code{ver_reportes} & --- & archivo \code{application/}\allowbreak \code{pdf} o \code{text/csv} (QuestPDF / CSV UTF-8+BOM) \\
+\end{apiTable}
+
+\section{15. Auditoría}
+\label{sec:api-auditoria}
+
+\subsection{\texttt{AuditoriaController} --- \texttt{/api/auditoria} (\texttt{[Authorize]} a nivel de clase)}
+\begin{apiTable}{\texttt{AuditoriaController}}{tab:api-auditoria}
+GET & \texttt{/api/auditoria?}\allowbreak \texttt{categoria\&accion\&}\allowbreak \texttt{userId\&fechaDesde\&}\allowbreak \texttt{fechaHasta\&search\&}\allowbreak \texttt{page\&pageSize} & \code{ver_usuarios} & --- & bitácora paginada, más reciente primero; \code{search} por descripción o nombre de usuario (\code{ILIKE}) \\
+GET & \texttt{/api/auditoria/acciones} & \code{ver_usuarios} & --- & catálogo de acciones con su categoría, para poblar el filtro \\
+\end{apiTable}
+
+\noindent Sin \code{POST}/\code{PUT}/\code{DELETE}: la bitácora es \emph{append-only} y se escribe únicamente desde adentro del sistema, vía \code{IAudit}\allowbreak \code{Service} (ver \hyperref[adr:0013]{ADR 0013}).
+
+\bigskip
+\noindent\textbf{Relacionado:} Capítulo~\ref{sec:arch} (capas y pipeline de seguridad), Capítulo~\ref{sec:modelo-datos} (entidades referenciadas por cada DTO), Apéndice~\ref{sec:adr} (decisiones detrás de reglas como ``cobro desacoplado del laboratorio'' o ``\code{TrabajoPedido} en Borrador'').

@@ -1,0 +1,10 @@
+# Normalizar finales de línea: en el repositorio siempre LF, para que el
+# historial no se ensucie al alternar entre Windows y Overleaf (Linux).
+* text=auto eol=lf
+
+# Binarios: que git no intente convertirlos ni mostrarlos como diff de texto.
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.docx  binary

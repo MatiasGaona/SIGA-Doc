@@ -1,0 +1,52 @@
+\chapter{Conclusiones}
+\label{sec:conclusiones}
+
+\begin{quote}
+\itshape
+Este capítulo recoge las conclusiones del trabajo: los objetivos alcanzados, las limitaciones conocidas del sistema construido y las líneas de trabajo futuro.
+\end{quote}
+
+\section{Objetivos alcanzados}
+\label{sec:conclusiones-objetivos}
+
+De los cinco objetivos específicos planteados en el anteproyecto, tres se alcanzaron de forma directa: el módulo de pacientes (registro, historial clínico e historial de compras), el módulo clínico digital (consultas, diagnósticos y recetas) y el módulo de gestión de óptica con control de stock en tiempo real y registro de ventas. El objetivo de una interfaz amigable y accesible se alcanzó de forma cualitativa --- el sistema completo sigue un diseño visual consistente y responsive --- aunque sin una medición formal de usabilidad que lo confirme con datos.
+
+El objetivo de agendamiento en línea se alcanzó parcialmente. El paciente reserva su cita de forma autónoma desde el portal --- elige sucursal, profesional y horario disponible --- y la confirma desde el enlace que recibe por correo, todo desde el navegador de un dispositivo móvil o de escritorio. De las cuatro acciones que el objetivo enumeraba quedaron fuera dos: el sistema no permite reprogramar una cita, es decir cambiarle fecha y hora conservando el registro (para moverla hay que cancelarla y reservar una nueva), y la cancelación no es autónoma sino en dos pasos --- el paciente la solicita y el personal de la óptica la resuelve, decisión de diseño documentada en el Capítulo~\ref{sec:cambios-proyecto1}.
+
+Otros dos aspectos de los objetivos originales se resolvieron de forma distinta a la planteada, y se documentan con su justificación en ese mismo capítulo: la generación de pedidos a proveedores no quedó automática sino asistida por una notificación, y el objetivo cuantitativo de mejorar la eficiencia administrativa en al menos un 20\% no llegó a instrumentarse --- el sistema no mide ese indicador, por lo que no puede darse por alcanzado ni descartado con la evidencia disponible.
+
+\section{Limitaciones}
+\label{sec:conclusiones-limitaciones}
+
+Además de lo anterior, hay casos de uso contemplados en el anteproyecto que no llegaron a implementarse en esta etapa. Se listan aquí de forma explícita, en vez de omitirlos, porque forman parte del alcance propuesto originalmente:
+
+\begin{itemize}
+  \item \textbf{Reprogramación de citas.} No existe forma de cambiar la fecha y hora de un turno conservando el registro; la operación equivalente es cancelar y reservar de nuevo.
+  \item \textbf{Auditoría de accesos y operaciones --- cobertura parcial.} El módulo de Auditoría (Capítulo~\ref{mod:16-auditoria}) sí quedó implementado: hay bitácora consultable con filtros y la pantalla para explorarla. Lo que no quedó es cobertura exhaustiva --- la captura es curada y cubre quince acciones sensibles (inicios de sesión, cambios de contraseña, gestión de roles, anulación de ventas, devoluciones y cierres de caja), pero no el alta y edición de usuarios, los cambios de precio o costo, ni los ajustes manuales de stock.
+  \item \textbf{Adjuntar documentos.} No se pueden anexar archivos --- ni documentos del paciente ni resultados de estudios a una consulta. El historial clínico es enteramente estructurado.
+  \item \textbf{Unificación de pacientes duplicados.} No hay detección ni fusión de registros duplicados. El sistema previene el duplicado en el alta mediante la unicidad de la cédula, pero no ofrece forma de resolverlo si llega a producirse.
+  \item \textbf{Productividad por profesional.} Cada profesional dispone de un panel con sus propios indicadores (consultas del día, de la semana y del mes, pacientes únicos y recetas emitidas), pero no existe el reporte comparativo entre profesionales que el anteproyecto planteaba, con facturación generada, tiempo promedio de atención y ausencias.
+  \item \textbf{Segundo factor de autenticación.} La autenticación es por usuario y contraseña; no se implementó MFA.
+\end{itemize}
+
+Las limitaciones de diseño del sistema construido son:
+
+\begin{itemize}
+  \item El proyecto no cuenta con una batería de pruebas automatizadas; toda la validación descripta en el Capítulo~\ref{sec:validacion} se hizo de forma manual.
+  \item Cambiar o resetear una contraseña no invalida los tokens de sesión ya emitidos --- quedan válidos hasta su expiración natural.
+  \item El centro de notificaciones cubre hoy un solo canal externo (email); no incluye WhatsApp ni SMS.
+  \item El módulo de notificaciones tiene funcionalidad planificada y no implementada: registro histórico de los envíos por email que hoy se mandan sin dejar rastro en el sistema, aviso de retiro (\emph{pickup}) para ventas a pedido ya recibidas, y plantillas de mensaje administrables.
+  \item El soporte multi-sucursal tiene refinamientos pendientes: los niveles mínimo y máximo de stock son globales, no configurables por sucursal; algunos listados no ofrecen todavía un selector para que un usuario con visibilidad global filtre por sucursal.
+\end{itemize}
+
+\section{Mejoras futuras}
+\label{sec:conclusiones-mejoras}
+
+\begin{itemize}
+  \item Incorporar una suite de pruebas automatizadas, al menos sobre las reglas de negocio más sensibles (aislamiento por sucursal, cálculo de stock, reglas de cobro y facturación).
+  \item Evaluar canales de notificación adicionales (WhatsApp, SMS) si la óptica llega a contratar un proveedor real para alguno de ellos.
+  \item Completar las fases pendientes del módulo de notificaciones: bitácora de envíos, aviso de retiro y plantillas administrables.
+  \item Ampliar la cobertura de la auditoría a las operaciones que hoy quedan fuera: alta y edición de usuarios, cambios de precio y costo, y ajustes manuales de stock.
+  \item Extender el soporte multi-sucursal con los refinamientos identificados: configuración de stock mínimo/máximo por sucursal y selectores cross-sucursal en los listados que lo requieran.
+  \item Instrumentar los indicadores de gestión necesarios para medir, con datos reales de uso, si el sistema efectivamente mejora la eficiencia administrativa del Centro Óptico Santa María en la magnitud que el anteproyecto se propuso.
+\end{itemize}
